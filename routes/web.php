@@ -42,7 +42,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('purchase-requests/{purchaseRequest}/export', [PurchaseRequestController::class, 'exportExcel'])->name('purchase-requests.export');
         Route::get('purchase-requests/{purchaseRequest}/export-pdf', [PurchaseRequestController::class, 'exportPdf'])->name('purchase-requests.export.pdf');
 
-        // Route resource cho quản lý phiếu đề nghị
+        // ROUTE CHO VIỆC IMPORT VÀ XEM TRƯỚC (Ajax POST)
+        Route::post('purchase-requests/import-excel-process', [PurchaseRequestController::class, 'importPreview'])->name('purchase-requests.import-excel-process');
+        // ROUTE ĐỂ HIỂN THỊ TRANG XEM TRƯỚC (GET)
+        Route::get('purchase-requests/import-preview', [PurchaseRequestController::class, 'showImportPreview'])->name('purchase-requests.import-preview');
+        // ROUTE ĐỂ TẠO CÁC PHIẾU TỪ DỮ LIỆU ĐÃ XEM TRƯỚC (Ajax POST)
+        Route::post('purchase-requests/create-from-import', [PurchaseRequestController::class, 'createFromImport'])->name('purchase-requests.create-from-import');
+
+
+        // Route resource cho quản lý phiếu đề nghị (phải để sau các route tùy chỉnh của resource)
         Route::resource('purchase-requests', PurchaseRequestController::class);
 
         // Nhóm route cho việc phê duyệt

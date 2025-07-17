@@ -8,12 +8,39 @@ use Illuminate\Database\Eloquent\Model;
 class PurchaseRequest extends Model
 {
     use HasFactory;
-    protected $guarded = [];
+    // Thay thế protected $guarded = []; bằng protected $fillable
+    protected $fillable = [
+        'pia_code',
+        'requester_id',
+        'section_id',
+        'executing_department_id',
+        'branch_id',
+        'sap_release_date',
+        'requested_delivery_date',
+        'currency',
+        'total_amount',
+        'total_order_quantity',
+        'total_inventory_quantity',
+        'status',
+        'priority',
+        'remarks',
+        'attachment_path',
+        'rejection_reason',
+        'current_rank_level',
+        'requires_director_approval',
+        'sap_request_date', // Cột mới từ Req.Date
+        'po_number',        // Cột mới từ PO
+        'po_date',          // Cột mới từ PO Date
+        'sap_created_by',   // Cột mới từ Created
+    ];
 
     protected $casts = [
         'sap_release_date' => 'date',
         'requested_delivery_date' => 'date',
         'requires_director_approval' => 'boolean',
+        // THÊM CAST CHO CÁC CỘT DATE MỚI
+        'sap_request_date' => 'date',
+        'po_date' => 'date',
     ];
 
     public function requester()
@@ -51,7 +78,7 @@ class PurchaseRequest extends Model
         switch ($this->status) {
             case 'pending_approval':
                 return 'Chờ duyệt';
-            case 'purchasing_approval': // <-- Đã xóa khoảng trắng thừa ở đây
+            case 'purchasing_approval':
                 return 'Phòng Mua duyệt';
             case 'completed':
                 return 'Hoàn thành';
@@ -67,7 +94,7 @@ class PurchaseRequest extends Model
         switch ($this->status) {
             case 'pending_approval':
                 return 'bg-warning text-dark';
-            case 'purchasing_approval': // <-- Đã xóa khoảng trắng thừa ở đây
+            case 'purchasing_approval':
                 return 'bg-info text-dark';
             case 'completed':
                 return 'bg-success';

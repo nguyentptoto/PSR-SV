@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('purchase_requests', function (Blueprint $table) {
@@ -32,10 +35,19 @@ return new class extends Migration
             $table->integer('current_rank_level')->default(1);
             $table->boolean('requires_director_approval')->default(false);
 
+            // THÊM CÁC CỘT MỚI TẠI ĐÂY CHO PURCHASE REQUESTS
+            $table->date('sap_request_date')->nullable(); // Từ Req.Date
+            $table->string('po_number', 255)->nullable();   // Từ PO
+            $table->date('po_date')->nullable();           // Từ PO Date
+            $table->string('sap_created_by', 255)->nullable(); // Từ Created
+
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('purchase_requests');

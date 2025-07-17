@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('purchase_request_items', function (Blueprint $table) {
@@ -23,10 +26,18 @@ return new class extends Migration
             $table->decimal('subtotal', 20, 2);
             $table->string('using_dept_code')->nullable();
             $table->string('plant_system')->nullable();
+
+            // THÊM CÁC CỘT MỚI TẠI ĐÂY CHO PURCHASE REQUEST ITEMS
+            $table->string('purchase_group', 20)->nullable(); // Từ PGr
+            $table->string('legacy_item_code', 255)->nullable(); // Từ cột A (Cột B)
+
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('purchase_request_items');
