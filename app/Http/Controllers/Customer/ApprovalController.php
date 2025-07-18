@@ -66,7 +66,7 @@ class ApprovalController extends Controller
                     }
 
                     $subQ->where('current_rank_level', $rankLevel)
-                         ->where('branch_id', $assignment->branch_id);
+                        ->where('branch_id', $assignment->branch_id);
 
                     if ($assignment->group_id == $requestingGroupId) {
                         $subQ->where('status', 'pending_approval');
@@ -83,7 +83,7 @@ class ApprovalController extends Controller
             }
         });
 
-        $pendingRequests = $query->distinct()->latest()->paginate(15);
+        $pendingRequests = $query->distinct()->latest()->paginate(15)->withQueryString();
 
         return view('users.approvals.index', compact('pendingRequests', 'sections', 'requesters'));
     }
@@ -115,7 +115,7 @@ class ApprovalController extends Controller
             $query->where('section_id', $request->section_id);
         }
 
-        $approvedRequests = $query->distinct()->latest()->paginate(15);
+        $approvedRequests = $query->distinct()->latest()->paginate(15)->withQueryString();
 
         return view('users.approvals.history', compact('approvedRequests', 'sections', 'requesters'));
     }
@@ -136,12 +136,17 @@ class ApprovalController extends Controller
             // Xác định tên vai trò chi tiết để lưu vào lịch sử
             $rankName = 'Cấp ' . $currentRankLevel; // Mặc định
             if ($isRequestingGroup) {
-                if ($currentRankLevel == 2) $rankName = 'Manager (Requesting)';
-                if ($currentRankLevel == 3) $rankName = 'General Manager';
-                if ($currentRankLevel == 4) $rankName = 'Director (Requesting)';
+                if ($currentRankLevel == 2)
+                    $rankName = 'Manager (Requesting)';
+                if ($currentRankLevel == 3)
+                    $rankName = 'General Manager';
+                if ($currentRankLevel == 4)
+                    $rankName = 'Director (Requesting)';
             } else {
-                if ($currentRankLevel == 2) $rankName = 'Manager (Purchasing)';
-                if ($currentRankLevel == 4) $rankName = 'Director (Purchasing)';
+                if ($currentRankLevel == 2)
+                    $rankName = 'Manager (Purchasing)';
+                if ($currentRankLevel == 4)
+                    $rankName = 'Director (Purchasing)';
             }
 
             // Ghi lại lịch sử hành động duyệt
@@ -203,7 +208,7 @@ class ApprovalController extends Controller
             $purchaseRequest->status = 'rejected';
             $purchaseRequest->save();
 
-             ApprovalHistory::create([
+            ApprovalHistory::create([
                 'purchase_request_id' => $purchaseRequest->id,
                 'user_id' => Auth::id(),
                 'rank_at_approval' => 'Cấp ' . $purchaseRequest->current_rank_level,
@@ -237,13 +242,14 @@ class ApprovalController extends Controller
         $groupName = $isRequestingStage ? 'Phòng Đề Nghị' : 'Phòng Mua';
         $targetGroupId = Group::where('name', $groupName)->value('id');
 
-        if (!$targetGroupId) return collect();
+        if (!$targetGroupId)
+            return collect();
 
         $approverQuery = User::query()
             ->whereHas('assignments', function ($q) use ($nextRankLevel, $branchId, $targetGroupId) {
                 $q->whereHas('approvalRank', fn($r) => $r->where('rank_level', $nextRankLevel))
-                  ->where('branch_id', $branchId)
-                  ->where('group_id', $targetGroupId);
+                    ->where('branch_id', $branchId)
+                    ->where('group_id', $targetGroupId);
             });
 
         if ($isRequestingStage && $nextRankLevel < 4) {
@@ -256,4 +262,36 @@ class ApprovalController extends Controller
 
         return $approverQuery->get();
     }
+    public function bulkApprove(Request $request)
+    {
+        $request->validate([
+            'request_ids' => 'required|array|min:1',
+            'request_ids.*' => 'exists:purchase_requests,id',
+        ]);
+
+        $approvedCount = 0;
+        $failedCount = 0;
+
+        foreach ($request->request_ids as $id) {
+            $purchaseRequest = PurchaseRequest::find($id);
+            if ($purchaseRequest) {
+                try {
+                    $approveRequest = new Request(['comment' => 'Duyệt hàng loạt']);
+                    $this->approve($approveRequest, $purchaseRequest);
+                    $approvedCount++;
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Lỗi duyệt hàng loạt phiếu #{$id}: " . $e->getMessage());
+                    $failedCount++;
+                }
+            }
+        }
+
+        $message = "Đã duyệt thành công {$approvedCount} phiếu.";
+        if ($failedCount > 0) {
+            $message .= " Có {$failedCount} phiếu không thể duyệt do lỗi hoặc không đủ quyền.";
+        }
+
+        return redirect()->route('users.approvals.index')->with('success', $message);
+    }
 }
+

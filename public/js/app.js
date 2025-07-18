@@ -194,4 +194,45 @@ $(document).ready(function () {
 
 
 
+// Phê duyệt hàng loạt
+$(document).ready(function () {
+    // Script cho chức năng chọn tất cả
+    $('#check-all').on('click', function () {
+        $('.request-checkbox').prop('checked', $(this).prop('checked'));
+    });
+    $('.request-checkbox').on('click', function () {
+        if (!$(this).prop('checked')) {
+            $('#check-all').prop('checked', false);
+        }
+    });
+
+    // ✅ SỬA ĐỔI: Logic cho modal tùy chỉnh
+    const bulkModal = $('#bulkApproveModalOverlay');
+
+    // Mở modal
+    $('#bulk-approve-trigger-btn').on('click', function () {
+        const selectedCount = $('input.request-checkbox:checked').length;
+        if (selectedCount === 0) {
+            alert('Vui lòng chọn ít nhất một phiếu để duyệt.');
+            return;
+        }
+        $('#selected-count').text(selectedCount);
+        bulkModal.css('display', 'flex');
+        setTimeout(() => bulkModal.addClass('show'), 10);
+    });
+
+    // Đóng modal
+    function closeModal() {
+        bulkModal.removeClass('show');
+        setTimeout(() => bulkModal.css('display', 'none'), 300);
+    }
+
+    $('#close-bulk-modal-btn').on('click', closeModal);
+    $('#cancel-bulk-approve-btn').on('click', closeModal);
+
+    // Khi nhấn nút xác nhận, gửi form
+    $('#confirm-bulk-approve-btn').on('click', function () {
+        $('#bulk-approve-form').submit();
+    });
+});
 

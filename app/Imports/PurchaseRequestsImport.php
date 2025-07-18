@@ -18,18 +18,20 @@ use Illuminate\Support\Facades\Auth;
 class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkReading
 {
     private $errors = [];
-    private $importedData = []; // Mảng để lưu trữ dữ liệu các phiếu đã được phân tích
+    private $importedData = [];
 
     public function collection(Collection $rows)
     {
-        // Dòng này đã thực hiện nhiệm vụ của nó. Sau khi bạn xác nhận lỗi đã biến mất,
-        // bạn có thể bình luận lại hoặc xóa nó.
-        if ($rows->isNotEmpty() && is_array($rows->first())) {
-             Log::info('Excel Headers (processed by WithHeadingRow):', array_keys($rows->first()));
-         }
+        // Gỡ bình luận dòng này để xem các tiêu đề cột được Maatwebsite/Excel xử lý như thế nào trong log của Laravel
+        // Điều này cực kỳ hữu ích để debug nếu bạn gặp lỗi không tìm thấy cột
+        // if ($rows->isNotEmpty() && $rows->first() instanceof \ArrayAccess) {
+        //     Log::info('Excel Headers (processed by WithHeadingRow):', $rows->first()->keys()->toArray());
+        // }
+
+        // Lấy thông tin prs_id của người dùng đang đăng nhập
+        $loggedInUserPrsId = Auth::user()->prs_id;
 
         // Nhóm các dòng theo cột PR_NO linh hoạt:
-        // Đã xác định trong log là 'purchreq' cho excel đa mã. Giữ 'purch_req' và 'purch.req.' làm fallback.
         $groupedItems = $rows->groupBy(function($item) {
             return (string)($item['purchreq'] ?? $item['purch_req'] ?? $item['purch.req.'] ?? '');
         });
@@ -72,7 +74,7 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
             $firstItemRow = $items->first();
             $originalExcelRowFirstItem = $rows->search($firstItemRow) + 2;
 
-            // Ánh xạ ExecutingDepartmentCode: log là 'requisnr'
+            // Ánh xạ ExecutingDepartmentCode
             $executingDepartmentCode = (string)($firstItemRow['requisnr'] ?? $firstItemRow['requisnr.'] ?? $firstItemRow['requesting'] ?? '');
             $executingDepartmentCode = trim($executingDepartmentCode);
 
@@ -82,9 +84,8 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                 continue;
             }
 
-            // Ánh xạ Requested Delivery Date: log là 'delivdt'
+            // Ánh xạ Requested Delivery Date
             $requestedDeliveryDate = null;
-            // Ưu tiên 'delivdt' từ log, sau đó các fallback cũ
             $deliveryDateExcel = $firstItemRow['delivdt'] ?? $firstItemRow['deliv.dt'] ?? $firstItemRow['deliv. date'] ?? $firstItemRow['deliv_date'] ?? null;
             if (!empty($deliveryDateExcel)) {
                 try {
@@ -102,10 +103,10 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                 continue;
             }
 
-            // Ánh xạ Currency: log là 'un' (cho đơn vị, chứ không phải currency), 'crcy' (cho currency)
+            // Ánh xạ Currency
             $currency = (string)($firstItemRow['crcy'] ?? $firstItemRow['currency'] ?? 'VND');
 
-            // Ánh xạ SAP Request Date: log là 'reqdate'
+            // Ánh xạ SAP Request Date
             $sapRequestDate = null;
             $requestDateExcel = $firstItemRow['reqdate'] ?? $firstItemRow['req.date'] ?? $firstItemRow['req_date'] ?? null;
             if (!empty($requestDateExcel)) {
@@ -120,10 +121,10 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                 }
             }
 
-            // Ánh xạ PO Number: log là 'po'
+            // Ánh xạ PO Number
             $poNumber = (string)($firstItemRow['po'] ?? null);
 
-            // Ánh xạ PO Date: log là 'po_date'
+            // Ánh xạ PO Date
             $poDate = null;
             $poDateExcel = $firstItemRow['po_date'] ?? $firstItemRow['po date'] ?? null;
             if (!empty($poDateExcel)) {
@@ -138,8 +139,11 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                 }
             }
 
-            // Ánh xạ Created By: log là 'created'
+            // Ánh xạ Created By: log là 'created'. Fallback về prs_id của người dùng đang đăng nhập.
             $sapCreatedBy = (string)($firstItemRow['created'] ?? null);
+            if (empty($sapCreatedBy)) {
+                $sapCreatedBy = $loggedInUserPrsId;
+            }
 
             $prData = [
                 'requester_id' => $requester->id,
@@ -147,7 +151,8 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                 'section_id' => $section->id,
                 'executing_department_id' => $executingDepartment->id,
                 'pia_code' => $piaCode,
-                'sap_release_date' => null,
+                // CẬP NHẬT DÒNG NÀY ĐỂ GÁN GIÁ TRỊ TỪ SAP REQUEST DATE
+                'sap_release_date' => $sapRequestDate ? $sapRequestDate->format('Y-m-d') : null,
                 'requested_delivery_date' => $requestedDeliveryDate->format('Y-m-d'),
                 'currency' => $currency,
                 'requires_director_approval' => false,
@@ -173,13 +178,13 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
             foreach ($items as $itemData) {
                 $originalExcelRow = $rows->search($itemData) + 2;
 
-                // Ánh xạ Material: log là 'material'
+                // Ánh xạ Material
                 $itemCode = (string)($itemData['material'] ?? '');
-                // Ánh xạ Item Name: log là 'short_text' hoặc 'description'
+                // Ánh xạ Item Name
                 $itemName = (string)($itemData['short_text'] ?? $itemData['description'] ?? '');
-                // Ánh xạ Quantity: log là 'quantity'
+                // Ánh xạ Quantity
                 $orderQuantity = (float)($itemData['quantity'] ?? 0);
-                // Ánh xạ Total Val.: log là 'total_val'
+                // Ánh xạ Total Val.
                 $totalVal = (float)($itemData['total_val'] ?? $itemData['total val.'] ?? 0);
 
                 // Tính toán estimated_price
@@ -210,32 +215,29 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
 
                 $subtotal = $orderQuantity * $estimatedPrice;
 
-                // Ánh xạ Plant: log là 'plnt' hoặc 'plant'
+                // Ánh xạ Plant
                 $plant = (string)($itemData['plnt'] ?? $itemData['plant'] ?? '');
-                // Ánh xạ SLoc: log là 'sloc'
+                // Ánh xạ SLoc
                 $sloc = (string)($itemData['sloc'] ?? '');
                 $plantSystem = trim($plant . ' ' . $sloc);
 
-                // Ánh xạ PGr: log là 'pgr'
+                // Ánh xạ PGr
                 $purchaseGroup = (string)($itemData['pgr'] ?? null);
 
-                // Ánh xạ A: log là 'a'
+                // Ánh xạ A
                 $legacyItemCode = (string)($itemData['a'] ?? null);
 
                 $itemsForCurrentPr[] = [
                     'item_code' => $itemCode,
                     'item_name' => $itemName,
-                    // Ánh xạ Item: log là 'item' (cho mã hàng cũ của excel đa mã), fallback 'old_item_code'
-                    'old_item_code' => (string)($itemData['item'] ?? $itemData['old_item_code'] ?? null),
+                    'old_item_code' => (string)($itemData['item'] ?? null),
                     'order_quantity' => $orderQuantity,
-                    // Ánh xạ Unit: log là 'un' hoặc 'unit'
                     'order_unit' => (string)($itemData['un'] ?? $itemData['unit'] ?? 'PC'),
                     'inventory_quantity' => (float)($itemData['inventory_quantity'] ?? $orderQuantity),
                     'inventory_unit' => (string)($itemData['inventory_unit'] ?? $itemData['un'] ?? $itemData['unit'] ?? 'PC'),
                     'r3_price' => (float)($itemData['r3_price'] ?? 0),
                     'estimated_price' => $estimatedPrice,
                     'subtotal' => $subtotal,
-                    // Ánh xạ TrackingNo: log là 'trackingno'
                     'using_dept_code' => (string)($itemData['trackingno'] ?? null),
                     'plant_system' => $plantSystem,
                     'purchase_group' => $purchaseGroup,
@@ -255,20 +257,20 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
             $prData['total_amount'] = $currentPrTotalAmount;
             $prData['total_order_quantity'] = $currentPrTotalOrderQuantity;
             $prData['total_inventory_quantity'] = $currentPrTotalInventoryQuantity;
-            $prData['items'] = $itemsForCurrentPr; // Gán các mặt hàng đã xử lý vào dữ liệu phiếu
+            $prData['items'] = $itemsForCurrentPr;
 
-            $this->importedData[] = $prData; // Thêm dữ liệu phiếu vào mảng để trả về Controller
+            $this->importedData[] = $prData;
         }
     }
 
     public function headingRow(): int
     {
-        return 1; // Bỏ qua dòng đầu tiên làm tiêu đề
+        return 1;
     }
 
     public function chunkSize(): int
     {
-        return 500; // Điều chỉnh kích thước chunk tùy thuộc vào bộ nhớ server và kích thước file
+        return 500;
     }
 
     public function getErrors(): array

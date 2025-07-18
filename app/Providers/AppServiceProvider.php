@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Pagination\Paginator;
 use App\Models\User;
 use App\Policies\UserPolicy;
 
@@ -25,7 +26,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        //
+               Paginator::useBootstrap();
+
     }
     protected $policies = [
         User::class => UserPolicy::class,

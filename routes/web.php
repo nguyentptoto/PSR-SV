@@ -49,6 +49,8 @@ Route::middleware(['auth'])->group(function () {
         // ROUTE ĐỂ TẠO CÁC PHIẾU TỪ DỮ LIỆU ĐÃ XEM TRƯỚC (Ajax POST)
         Route::post('purchase-requests/create-from-import', [PurchaseRequestController::class, 'createFromImport'])->name('purchase-requests.create-from-import');
 
+        Route::post('purchase-requests/bulk-export-pdf', [PurchaseRequestController::class, 'bulkExportPdf'])->name('purchase-requests.bulk-export-pdf');
+
 
         // Route resource cho quản lý phiếu đề nghị (phải để sau các route tùy chỉnh của resource)
         Route::resource('purchase-requests', PurchaseRequestController::class);
@@ -57,6 +59,8 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('approvals')->name('approvals.')->group(function() {
             Route::get('/', [ApprovalController::class, 'index'])->name('index');
             Route::get('/history', [ApprovalController::class, 'history'])->name('history');
+            Route::post('/bulk-approve', [ApprovalController::class, 'bulkApprove'])->name('bulk-approve');
+
             Route::post('/{purchaseRequest}/approve', [ApprovalController::class, 'approve'])->name('approve');
             Route::post('/{purchaseRequest}/reject', [ApprovalController::class, 'reject'])->name('reject');
         });

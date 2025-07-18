@@ -4,16 +4,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Pagination Language Lines
+    | Các dòng ngôn ngữ phân trang
     |--------------------------------------------------------------------------
     |
-    | The following language lines are used by the paginator library to build
-    | the simple pagination links. You are free to change them to anything
-    | you want to customize your views to better match your application.
+    | Các dòng ngôn ngữ sau đây được sử dụng bởi thư viện phân trang để xây
+    | dựng các liên kết phân trang đơn giản. Bạn có thể tự do thay đổi chúng
+    | thành bất cứ điều gì bạn muốn để tùy chỉnh giao diện cho phù hợp hơn
+    | với ứng dụng của bạn.
     |
     */
 
-    'previous' => '&laquo; Previous',
-    'next' => 'Next &raquo;',
+    'previous' => '&laquo; Trang trước',
+    'next'     => 'Trang sau &raquo;',
 
 ];

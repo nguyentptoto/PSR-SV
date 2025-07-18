@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Section;
 use App\Models\Group;
 use App\Models\ApprovalRank;
+use App\Models\JobTitle;
 use App\Models\Assignment;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -15,7 +16,7 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use App\Models\JobTitle; // <--- Đảm bảo Model này đã được import và đúng tên
+use Illuminate\Http\File as IlluminateFile;
 
 class UsersImport implements ToCollection, WithHeadingRow
 {
@@ -29,92 +30,103 @@ class UsersImport implements ToCollection, WithHeadingRow
     public function collection(Collection $rows)
     {
         $branches = Branch::pluck('id', 'name');
-        $sections = Section::pluck('id', 'code'); // Sử dụng mã phòng ban
+        $sections = Section::pluck('id', 'code');
         $groups = Group::pluck('id', 'name');
         $ranks = ApprovalRank::pluck('id', 'rank_level');
-
-        // Lấy tất cả JobTitles và ánh xạ theo tên để dễ dàng tìm kiếm ID
-        // Đây là bước quan trọng để chuyển đổi tên chức danh từ Excel sang ID
-        $jobTitles = JobTitle::pluck('id', 'name'); // Lấy ID theo tên chức danh
+        $jobTitles = JobTitle::pluck('id', 'name');
 
         foreach ($rows as $row) {
-            DB::transaction(function () use ($row, $branches, $sections, $groups, $ranks, $jobTitles) { // Thêm $jobTitles vào use
-                // Bỏ qua hàng nếu không có 'toto_id'
-                if (empty($row['toto_id'])) {
+            DB::transaction(function () use ($row, $branches, $sections, $groups, $ranks, $jobTitles) {
+                $employeeId = trim($row['toto_id']);
+                $prsId = trim($row['sap_user_id']);
+
+                if (empty($employeeId)) {
                     return;
                 }
 
                 $mainBranchId = $branches[trim($row['chi_nhanh_chinh'])] ?? null;
-                // Nếu chi nhánh chính không tìm thấy, bỏ qua hàng này
                 if (!$mainBranchId) {
-                    // Log hoặc thông báo lỗi nếu cần thiết
-                    // \Log::warning("Branch '{$row['chi_nhanh_chinh']}' not found for user '{$row['toto_id']}'. Skipping row.");
                     return;
                 }
 
+                $jobTitleId = $jobTitles[trim($row['phan_quyen_tren_sap'])] ?? null;
+
+                // ✅ SỬA ĐỔI: Logic xử lý ảnh chữ ký để giữ nguyên tên file
                 $signatureDbPath = null;
-                if ($this->signaturesPath && !empty($row['chu_ky']) && File::exists($this->signaturesPath . '/' . $row['chu_ky'])) {
-                    $newPath = 'signatures/' . uniqid() . '_' . $row['chu_ky'];
-                    Storage::disk('public')->put($newPath, File::get($this->signaturesPath . '/' . $row['chu_ky']));
-                    $signatureDbPath = $newPath;
-                }
+                if ($this->signaturesPath && !empty($employeeId)) {
+                    // Tìm file ảnh không phân biệt extension (png, jpg, jpeg)
+                    $signatureFiles = File::glob($this->signaturesPath . '/' . $employeeId . '.*');
 
-                // --- Bắt đầu phần chỉnh sửa cho job_title_id ---
-                $jobTitleId = null; // Khởi tạo ID chức danh là null
+                    if (!empty($signatureFiles)) {
+                        $imageFile = new IlluminateFile($signatureFiles[0]);
 
-                // Lấy tên chức danh từ cột Excel 'phan_quyen_tren_sap'
-                // Đảm bảo tên cột trong Excel là 'phan_quyen_tren_sap' và chứa giá trị như 'MG', 'AGM', 'WK', v.v.
-                $jobTitleNameFromExcel = trim($row['phan_quyen_tren_sap']) ?? null;
+                        // Lấy tên file gốc (ví dụ: M012345.png)
+                        $newFileName = $imageFile->getBasename();
 
-                if ($jobTitleNameFromExcel) {
-                    // Tìm ID chức danh trong mảng $jobTitles đã được load sẵn
-                    $jobTitleId = $jobTitles[$jobTitleNameFromExcel] ?? null;
+                        // Sử dụng putFileAs để lưu với tên file tùy chỉnh
+                        $path = Storage::disk('public')->putFileAs(
+                            'signatures', // Thư mục lưu
+                            $imageFile,   // File cần lưu
+                            $newFileName  // Tên file mới
+                        );
 
-                    if (!$jobTitleId) {
-                        // Xử lý trường hợp không tìm thấy ID chức danh cho tên này
-                        // Tùy chọn: Log lỗi, gán ID mặc định, hoặc bỏ qua hàng
-                        \Log::warning("Job title '{$jobTitleNameFromExcel}' not found for user '{$row['toto_id']}'. Setting job_title_id to null.");
-                        // Nếu job_title_id là NOT NULL trong DB, bạn cần xử lý khác (ví dụ: gán một ID mặc định)
-                        // $jobTitleId = JobTitle::where('name', 'Default Job')->value('id');
+                        $signatureDbPath = $path;
                     }
                 }
-                // --- Kết thúc phần chỉnh sửa cho job_title_id ---
 
-                $user = User::updateOrCreate(
-                    ['employee_id' => $row['toto_id']],
-                    [
-                        'name' => ($row['last_name'] ?? '') . ' ' . ($row['frist_name'] ?? ''),
-                        'email' => $row['e_mail_address'],
-                        'prs_id' => $row['sap_user_id'],
-                        'job_title_id' => $jobTitleId, // Sử dụng ID đã tìm được
-                        'password' => Hash::make('12345678'), // Mật khẩu mặc định
-                        'main_branch_id' => $mainBranchId,
-                        'status' => true, // Giả sử trạng thái mặc định là true
-                        'signature_image_path' => $signatureDbPath
-                    ]
-                );
+                // Chuẩn bị dữ liệu để cập nhật hoặc tạo mới
+                $userData = [
+                    'name' => trim($row['last_name'] ?? '') . ' ' . trim($row['frist_name'] ?? ''),
+                    'email' => trim($row['e_mail_address']),
+                    'prs_id' => $prsId,
+                    'job_title_id' => $jobTitleId,
+                    'main_branch_id' => $mainBranchId,
+                    'status' => true,
+                ];
+                if ($signatureDbPath) {
+                    $userData['signature_image_path'] = $signatureDbPath;
+                }
 
+                // Tìm kiếm và cập nhật/tạo mới user
+                $user = User::where('employee_id', $employeeId)
+                            ->orWhere(function($query) use ($prsId) {
+                                if (!empty($prsId)) {
+                                    $query->where('prs_id', $prsId);
+                                }
+                            })->first();
+
+                if ($user) {
+                    $userData['employee_id'] = $employeeId;
+                    $user->update($userData);
+                } else {
+                    $userData['employee_id'] = $employeeId;
+                    $userData['password'] = Hash::make('12345678');
+                    $user = User::create($userData);
+                }
+
+                // Gán phòng ban
                 if (!empty($row['department'])) {
                     $sectionCodes = explode(',', $row['department']);
-                    // Thay thế Arrow Function `fn($code) => ...` bằng Anonymous Function cho PHP 7.4
-                    $sectionIds = collect($sectionCodes)->map(function ($code) use ($sections) {
-                        return $sections[trim($code)] ?? null;
-                    })->filter();
+                    $sectionIds = collect($sectionCodes)->map(fn($code) => $sections[trim($code)] ?? null)->filter();
                     $user->sections()->sync($sectionIds);
                 }
 
+                // Gán quyền hạn
                 $user->assignments()->delete();
                 if (!empty($row['phan_cap']) && !empty($row['group'])) {
-                    $assignmentGroupId = $groups[trim($row['group'])] ?? null;
-                    $assignmentRankId = $ranks[$row['phan_cap']] ?? null;
-                    if ($assignmentGroupId && $assignmentRankId) {
-                        Assignment::create([
-                            'user_id' => $user->id,
-                            'branch_id' => $mainBranchId,
-                            'approval_rank_id' => $assignmentRankId,
-                            'group_id' => $assignmentGroupId,
-                        ]);
-                    }
+                     $assignmentGroupId = $groups[trim($row['group'])] ?? null;
+                     $assignmentRankId = $ranks[$row['phan_cap']] ?? null;
+                     if($assignmentGroupId && $assignmentRankId) {
+                         $allBranches = Branch::all();
+                         foreach($allBranches as $branch) {
+                             Assignment::create([
+                                'user_id' => $user->id,
+                                'branch_id' => $branch->id,
+                                'approval_rank_id' => $assignmentRankId,
+                                'group_id' => $assignmentGroupId,
+                             ]);
+                         }
+                     }
                 }
             });
         }

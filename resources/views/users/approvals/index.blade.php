@@ -2,7 +2,6 @@
 @section('title', 'Duyệt Phiếu Đề Nghị')
 
 @section('content')
-{{-- Form lọc --}}
 <div class="card card-outline card-info">
     <div class="card-header"><h3 class="card-title">Lọc danh sách</h3></div>
     <div class="card-body">
@@ -47,101 +46,96 @@
     <div class="card-header">
         <h3 class="card-title">Danh sách phiếu cần xử lý</h3>
     </div>
-    <div class="card-body">
-        @if (session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-        @if (session('error'))
-            <div class="alert alert-danger">{!! session('error') !!}</div>
-        @endif
+    <form action="{{ route('users.approvals.bulk-approve') }}" method="POST" id="bulk-approve-form">
+        @csrf
+        <div class="card-body">
+            @if (session('success'))
+                <div class="alert alert-success">{{ session('success') }}</div>
+            @endif
+            @if (session('error'))
+                <div class="alert alert-danger">{!! session('error') !!}</div>
+            @endif
+            @if ($errors->any())
+                <div class="alert alert-danger">
+                    <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+                </div>
+            @endif
 
-        {{-- ✅ THÊM MỚI: Khối hiển thị lỗi validation chi tiết --}}
-        @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible">
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                <h5><i class="icon fas fa-ban"></i> Lỗi!</h5>
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+            <div class="mb-3">
+                <button type="button" class="btn btn-success" id="bulk-approve-trigger-btn">
+                    <i class="bi bi-check2-square"></i> Duyệt các mục đã chọn
+                </button>
             </div>
-        @endif
 
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead class="table-light">
-                    <tr>
-                        <th>Mã Phiếu</th>
-                        <th>Người tạo</th>
-                        <th>Phòng ban</th>
-                        <th>Tổng tiền</th>
-                        <th>Trạng thái hiện tại</th>
-                        <th>Ngày tạo</th>
-                        <th style="width: 200px;">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($pendingRequests as $request)
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
                         <tr>
-                            <td>
-                                <a href="{{ route('users.purchase-requests.show', ['purchase_request' => $request->id, 'from' => 'approvals']) }}">{{ $request->pia_code }}</a>
-                            </td>
-                            <td>{{ $request->requester->name ?? 'N/A' }}</td>
-                            <td>{{ $request->section->name ?? 'N/A' }}</td>
-                            <td>{{ number_format($request->total_amount, 2) }} {{ $request->currency }}</td>
-                            <td><span class="badge {{ $request->status_class }}">{{ $request->status_text }} (Cấp {{ $request->current_rank_level }})</span></td>
-                            <td>{{ $request->created_at->format('d/m/Y H:i') }}</td>
-                            <td>
-                                @can('approve', $request)
-                                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveModal" data-action-url="{{ route('users.approvals.approve', $request->id) }}">Duyệt</button>
-                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal" data-action-url="{{ route('users.approvals.reject', $request->id) }}">Từ chối</button>
-                                @else
-                                    <span class="text-muted">Đã xử lý hoặc chờ cấp khác</span>
-                                @endif
-                            </td>
+                            <th style="width: 10px;"><input type="checkbox" id="check-all"></th>
+                            <th>Mã Phiếu</th>
+                            <th>Người tạo</th>
+                            <th>Phòng ban</th>
+                            <th>Tổng tiền</th>
+                            <th>Trạng thái hiện tại</th>
+                            <th>Ngày tạo</th>
+                            <th style="width: 150px;">Hành động</th>
                         </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="text-center">Không có phiếu nào.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @forelse ($pendingRequests as $request)
+                            <tr>
+                                <td><input type="checkbox" name="request_ids[]" class="request-checkbox" value="{{ $request->id }}"></td>
+                                <td>
+                                    <a href="{{ route('users.purchase-requests.show', ['purchase_request' => $request->id, 'from' => 'approvals']) }}">{{ $request->pia_code }}</a>
+                                </td>
+                                <td>{{ $request->requester->name ?? 'N/A' }}</td>
+                                <td>{{ $request->section->name ?? 'N/A' }}</td>
+                                <td>{{ number_format($request->total_amount, 2) }} {{ $request->currency }}</td>
+                                <td><span class="badge {{ $request->status_class }}">{{ $request->status_text }} (Cấp {{ $request->current_rank_level }})</span></td>
+                                <td>{{ $request->created_at->format('d/m/Y H:i') }}</td>
+                                <td>
+                                    @can('approve', $request)
+                                        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveModal" data-action-url="{{ route('users.approvals.approve', $request->id) }}">Duyệt</button>
+                                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal" data-action-url="{{ route('users.approvals.reject', $request->id) }}">Từ chối</button>
+                                    @else
+                                        <span class="text-muted">Đã xử lý hoặc chờ cấp khác</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center">Không có phiếu nào đang chờ bạn duyệt.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-3">
+                {{ $pendingRequests->withQueryString()->links() }}
+            </div>
         </div>
-        <div class="mt-3">
-            {{ $pendingRequests->withQueryString()->links() }}
-        </div>
-    </div>
+    </form>
 </div>
 
-<!-- Modal Phê duyệt -->
-<div class="modal fade" id="approveModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Xác nhận Phê duyệt</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+
+{{-- ✅ SỬA ĐỔI: Modal Xác nhận Duyệt Hàng Loạt (Phiên bản tùy chỉnh) --}}
+<div class="custom-modal-overlay" id="bulkApproveModalOverlay">
+    <div class="custom-modal-content">
+      <div class="custom-modal-header">
+        <h5 class="custom-modal-title">Xác nhận Duyệt Hàng Loạt</h5>
+        <button type="button" class="custom-modal-close" id="close-bulk-modal-btn">&times;</button>
       </div>
-      <form id="approve-form" method="POST" action="">
-          @csrf
-          <div class="modal-body">
-              <p>Bạn có chắc chắn muốn phê duyệt phiếu này?</p>
-              <div class="mb-3">
-                  <label for="approve_comment" class="form-label">Ghi chú (tùy chọn):</label>
-                  <textarea class="form-control" id="approve_comment" name="comment" rows="3"></textarea>
-              </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-            <button type="submit" class="btn btn-success">Xác nhận Duyệt</button>
-          </div>
-      </form>
+      <div class="custom-modal-body">
+          <p>Bạn có chắc chắn muốn phê duyệt tất cả <strong id="selected-count">0</strong> phiếu đã chọn?</p>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancel-bulk-approve-btn">Hủy</button>
+        <button type="button" class="btn btn-success" id="confirm-bulk-approve-btn">Xác nhận Duyệt</button>
+      </div>
     </div>
-  </div>
 </div>
 
-<!-- Modal Từ chối -->
+
 <div class="modal fade" id="rejectModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -165,6 +159,7 @@
     </div>
   </div>
 </div>
+
 @endsection
 
 @push('scripts')
@@ -182,6 +177,31 @@
             let actionUrl = button.data('action-url');
             let form = $('#reject-form');
             form.attr('action', actionUrl);
+        });
+
+        $('#check-all').on('click', function() {
+            $('.request-checkbox').prop('checked', $(this).prop('checked'));
+        });
+
+        $('.request-checkbox').on('click', function() {
+            if (!$(this).prop('checked')) {
+                $('#check-all').prop('checked', false);
+            }
+        });
+
+        $('#bulk-approve-trigger-btn').on('click', function() {
+            const selectedCount = $('input.request-checkbox:checked').length;
+            if (selectedCount === 0) {
+                alert('Vui lòng chọn ít nhất một phiếu để duyệt.');
+                return;
+            }
+            $('#selected-count').text(selectedCount);
+            var bulkApproveModal = new bootstrap.Modal(document.getElementById('bulkApproveModal'));
+            bulkApproveModal.show();
+        });
+
+        $('#confirm-bulk-approve-btn').on('click', function() {
+            $('#bulk-approve-form').submit();
         });
     });
 </script>

@@ -22,6 +22,7 @@ use Maatwebsite\Excel\Excel as ExcelWriter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Imports\PurchaseRequestsImport;
+use ZipArchive;
 
 
 class PurchaseRequestController extends Controller
@@ -29,9 +30,9 @@ class PurchaseRequestController extends Controller
     public function index()
     {
         $purchaseRequests = PurchaseRequest::where('requester_id', Auth::id())
-                                        ->with(['branch', 'executingDepartment'])
-                                        ->latest()
-                                        ->paginate(15);
+            ->with(['branch', 'executingDepartment'])
+            ->latest()
+            ->paginate(15);
         return view('users.purchase_requests.index', compact('purchaseRequests'));
     }
 
@@ -318,7 +319,8 @@ class PurchaseRequestController extends Controller
         $groupName = $isRequestingStage ? 'Phòng Đề Nghị' : 'Phòng Mua';
         $targetGroupId = Group::where('name', $groupName)->value('id');
 
-        if (!$targetGroupId) return collect();
+        if (!$targetGroupId)
+            return collect();
 
         $approverQuery = User::query()
             ->whereHas('assignments', function ($q) use ($nextRankLevel, $branchId, $targetGroupId) {
@@ -419,8 +421,8 @@ class PurchaseRequestController extends Controller
         $section = $requester->sections->first();
 
         $existingPiaCodes = PurchaseRequest::whereIn('pia_code', collect($importedPurchaseRequests)->pluck('pia_code')->toArray())
-                                            ->pluck('pia_code')
-                                            ->toArray();
+            ->pluck('pia_code')
+            ->toArray();
 
         foreach ($importedPurchaseRequests as $prData) {
             if (in_array($prData['pia_code'], $existingPiaCodes) || PurchaseRequest::where('pia_code', $prData['pia_code'])->exists()) {
@@ -480,5 +482,45 @@ class PurchaseRequestController extends Controller
             'successful_pia_codes' => $successfulPiaCodes,
             'redirect_url' => route('users.purchase-requests.index')
         ]);
+    }
+    /**
+     * ✅ THÊM MỚI: Xử lý in hàng loạt các phiếu đề nghị ra file PDF (được nén trong ZIP).
+     */
+
+    public function bulkExportPdf(Request $request)
+    {
+        $request->validate([
+            'request_ids' => 'required|array|min:1',
+            'request_ids.*' => 'exists:purchase_requests,id',
+        ]);
+
+        $prIds = $request->input('request_ids');
+        $zipFileName = 'tong-hop-phieu-de-nghi-' . now()->format('Y-m-d-His') . '.zip';
+        $zip = new ZipArchive();
+
+        // Tạo một file ZIP tạm thời trong bộ nhớ
+        $tempZipPath = tempnam(sys_get_temp_dir(), 'zip');
+
+        if ($zip->open($tempZipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+            return back()->with('error', 'Không thể tạo file nén.');
+        }
+
+        foreach ($prIds as $id) {
+            $pr = PurchaseRequest::with('requester', 'branch', 'section', 'executingDepartment', 'items', 'approvalHistories.user')->find($id);
+            if ($pr) {
+                $pdfFileName = 'PR_' . $pr->pia_code . '.pdf';
+
+                // Tạo nội dung file PDF trong bộ nhớ (dưới dạng chuỗi)
+                $pdfContent = Excel::raw(new PurchaseRequestExport($pr), ExcelWriter::MPDF);
+
+                // Thêm trực tiếp nội dung chuỗi đó vào file ZIP
+                $zip->addFromString($pdfFileName, $pdfContent);
+            }
+        }
+
+        $zip->close();
+
+        // Tải file ZIP về cho người dùng và tự động xóa sau khi tải xong
+        return response()->download($tempZipPath, $zipFileName)->deleteFileAfterSend(true);
     }
 }
