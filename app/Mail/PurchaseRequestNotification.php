@@ -29,16 +29,22 @@ class PurchaseRequestNotification extends Mailable
      */
     public function build()
     {
-        // Định nghĩa chủ đề email
-        $subject = 'Thông báo: Phiếu đề nghị cần xử lý (' . $this->purchaseRequest->pia_code . ')';
+        // 1. TIÊU ĐỀ CHUNG - Không chứa thông tin động
+        // Tiêu đề này sẽ giống hệt nhau cho mọi email.
+        $subject = 'Thông báo: Có phiếu đề nghị mua hàng cần xử lý';
 
-        // Định nghĩa nội dung email sử dụng markdown view
+        // 2. ID THAM CHIẾU CHUNG - Một chuỗi cố định
+        // ID này cũng giống hệt nhau cho mọi email.
+        $domain = parse_url(config('app.url'), PHP_URL_HOST);
+        $threadId = "<purchase-request-notifications@{$domain}>";
+
         return $this->subject($subject)
-                    ->markdown('emails.purchase_request_notification'); // Sử dụng phương thức markdown()
-
-        // Hoặc nếu bạn muốn dùng view HTML
-        // return $this->subject($subject)
-        //             ->view('emails.purchase_request_notification_html');
+            ->markdown('emails.purchase_request_notification')
+            ->withSwiftMessage(function ($message) use ($threadId) {
+                // 3. THIẾT LẬP HEADER
+                // Vì subject và threadId luôn giống nhau, các hòm thư sẽ gom tất cả vào một chỗ.
+                $message->getHeaders()->addTextHeader('References', $threadId);
+            });
     }
 
     /**

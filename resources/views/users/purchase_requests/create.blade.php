@@ -3,7 +3,6 @@
 
 @section('content')
     {{-- Khối hiển thị thông báo (errors, warnings, success) --}}
-    {{-- Các thông báo này từ các hành động submit form create thông thường hoặc từ redirect sau khi import/tạo phiếu --}}
     @if (session('error'))
         <div class="alert alert-danger alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -26,7 +25,7 @@
         </div>
     @endif
     {{-- Chỉ hiển thị lỗi validation nếu không phải từ import Excel --}}
-    @if ($errors->any()) {{-- Không cần kiểm tra !session('import_errors') nữa vì import Preview trả về JSON --}}
+    @if ($errors->any())
         <div class="alert alert-danger alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             <h5 class="alert-heading"><i class="icon fas fa-ban"></i> Lỗi!</h5>
@@ -56,7 +55,8 @@
                         <label for="section_id">Phòng ban của bạn*</label>
                         <select name="section_id" class="form-control" required>
                             @foreach ($user->sections as $section)
-                                <option value="{{ $section->id }}" {{ old('section_id', $user->sections->first()->id) == $section->id ? 'selected' : '' }}>
+                                <option value="{{ $section->id }}"
+                                    {{ old('section_id', $user->sections->first()->id) == $section->id ? 'selected' : '' }}>
                                     {{ $section->name }}
                                 </option>
                             @endforeach
@@ -88,15 +88,19 @@
                     </div>
                     <div class="col-md-4 form-group">
                         <label for="requested_delivery_date">Ngày yêu cầu giao hàng*</label>
-                        <input type="date" name="requested_delivery_date" class="form-control" value="{{ old('requested_delivery_date') }}" required>
+                        <input type="date" name="requested_delivery_date" class="form-control"
+                            value="{{ old('requested_delivery_date') }}" required>
                     </div>
                     <div class="col-md-4 form-group">
                         <label for="priority">Mức độ ưu tiên</label>
                         <select name="priority" class="form-control">
                             <option value="">-- Chọn mức độ --</option>
-                            <option value="normal" {{ old('priority') == 'normal' ? 'selected' : '' }}>Normal/Bình thường</option>
-                            <option value="urgent" {{ old('priority') == 'urgent' ? 'selected' : '' }}>Urgent/Khẩn cấp</option>
-                            <option value="quotation_only" {{ old('priority') == 'quotation_only' ? 'selected' : '' }}>Quotation only/Báo giá</option>
+                            <option value="normal" {{ old('priority') == 'normal' ? 'selected' : '' }}>Normal/Bình thường
+                            </option>
+                            <option value="urgent" {{ old('priority') == 'urgent' ? 'selected' : '' }}>Urgent/Khẩn cấp
+                            </option>
+                            <option value="quotation_only" {{ old('priority') == 'quotation_only' ? 'selected' : '' }}>
+                                Quotation only/Báo giá</option>
                         </select>
                     </div>
                     <div class="col-md-4 form-group">
@@ -113,8 +117,9 @@
                 </div>
 
                 <div class="form-group mt-2">
-                    <label for="attachment_file">File đính kèm</label>
-                    <input type="file" name="attachment_file" id="attachment_file" class="form-control">
+                    <label for="attachment_file">File đính kèm (Phiếu đơn lẻ)</label>
+                    <input type="file" name="attachment_file" id="attachment_file" class="form-control"
+                        accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,application/zip">
                 </div>
                 <div class="form-check mt-2">
                     <input class="form-check-input" type="checkbox" value="1" id="requires_director_approval"
@@ -128,7 +133,8 @@
                 <div class="row mt-3">
                     <div class="col-md-4 form-group">
                         <label for="sap_request_date">Ngày yêu cầu (SAP Req.Date)</label>
-                        <input type="date" name="sap_request_date" class="form-control" value="{{ old('sap_request_date') }}">
+                        <input type="date" name="sap_request_date" class="form-control"
+                            value="{{ old('sap_request_date') }}">
                     </div>
                     <div class="col-md-4 form-group">
                         <label for="po_number">Số PO (PO Number)</label>
@@ -140,7 +146,8 @@
                     </div>
                     <div class="col-md-4 form-group">
                         <label for="sap_created_by">Người tạo (SAP Created By)</label>
-                        <input type="text" name="sap_created_by" class="form-control" value="{{ old('sap_created_by') }}">
+                        <input type="text" name="sap_created_by" class="form-control"
+                            value="{{ old('sap_created_by') }}">
                     </div>
                 </div>
             </div>
@@ -160,7 +167,7 @@
                                 <th style="width: 10%;">Mã hàng*</th>
                                 <th style="width: 15%;">Tên hàng*</th>
                                 <th style="width: 10%;">Mã hàng cũ</th>
-                                <th style="width: 10%;">Mã hàng phụ</th> {{-- Cột mới Legacy Item Code --}}
+                                <th style="width: 10%;">Mã hàng phụ</th>
                                 <th style="width: 7%;">SL Đặt*</th>
                                 <th style="width: 5%;">ĐV Đặt</th>
                                 <th style="width: 7%;">SL Kho</th>
@@ -170,7 +177,7 @@
                                 <th style="width: 10%;">Thành tiền</th>
                                 <th style="width: 8%;">Mã phòng SD</th>
                                 <th style="width: 8%;">Plant hệ</th>
-                                <th style="width: 8%;">Nhóm mua hàng</th> {{-- Cột mới Purchase Group --}}
+                                <th style="width: 8%;">Nhóm mua hàng</th>
                                 <th style="width: 3%;"></th>
                             </tr>
                         </thead>
@@ -220,17 +227,31 @@
         <div class="card-body">
             <div class="callout callout-info mb-3">
                 <h5><i class="fas fa-file-excel"></i> Hướng dẫn Import</h5>
-                <p>Bạn có thể chuẩn bị file Excel chứa **nhiều mã PR khác nhau**. Hệ thống sẽ tự động **nhóm các mặt hàng có cùng Mã Phiếu (Purch.Req.)** và chuyển hướng đến trang xem trước để bạn kiểm tra trước khi tạo phiếu chính thức.</p>
+                <p>Bạn có thể chuẩn bị file Excel chứa **nhiều mã PR khác nhau**. Hệ thống sẽ tự động **nhóm các mặt hàng có
+                    cùng Mã Phiếu (Purch.Req.)** và chuyển hướng đến trang xem trước để bạn kiểm tra trước khi tạo phiếu
+                    chính thức.</p>
                 <button type="button" class="btn btn-info" data-bs-toggle="modal"
-                    data-bs-target="#importInstructionsModal"><i class="fas fa-info-circle"></i> Xem hướng dẫn định dạng file Excel</button>
+                    data-bs-target="#importInstructionsModal"><i class="fas fa-info-circle"></i> Xem hướng dẫn định dạng
+                    file Excel</button>
             </div>
-            <form action="{{ route('users.purchase-requests.import-excel-process') }}" method="POST" enctype="multipart/form-data" id="import-excel-form">
+            <form action="{{ route('users.purchase-requests.import-excel-process') }}" method="POST"
+                enctype="multipart/form-data" id="import-excel-form">
                 @csrf
-                <div class="form-group">
-                    <label for="excel_file">Chọn file Excel để Import</label>
-                    <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx, .xls" required>
+                <div class="form-group mb-3">
+                    <label for="excel_file" class="form-label">Chọn file Excel để Import</label>
+                    <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx, .xls"
+                        required>
                 </div>
-                <button type="submit" class="btn btn-success mt-3" id="submit-import-excel-btn"><i class="fas fa-upload"></i> Đọc File Excel để Xem Trước</button>
+                <div class="form-group mb-3">
+                    <label for="attachment_zip_file" class="form-label">File đính kèm (ZIP - Tùy chọn)</label>
+                    <p class="text-muted small">Nếu có, file ZIP này phải chứa các file con được đặt tên theo Mã PR (ví dụ:
+                        <code>101532462.pdf</code> hoặc <code>1101532462.jpg</code>). Hệ thống sẽ cố gắng khớp
+                        và đính kèm.</p>
+                    <input type="file" name="attachment_zip_file" id="attachment_zip_file" class="form-control"
+                        accept="application/zip">
+                </div>
+                <button type="submit" class="btn btn-success mt-3" id="submit-import-excel-btn"><i
+                        class="fas fa-upload"></i> Đọc File Excel để Xem Trước</button>
             </form>
         </div>
     </div>
@@ -242,11 +263,13 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="importInstructionsModalLabel">Hướng dẫn Định dạng File Excel cho Import Nhiều Phiếu</h5>
+                    <h5 class="modal-title" id="importInstructionsModalLabel">Hướng dẫn Định dạng File Excel cho Import
+                        Nhiều Phiếu</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Chuẩn bị file Excel với **dòng tiêu đề** (Header Row) ở dòng đầu tiên. Dòng tiêu đề sẽ bị bỏ qua khi import.</p>
+                    <p>Chuẩn bị file Excel với **dòng tiêu đề** (Header Row) ở dòng đầu tiên. Dòng tiêu đề sẽ bị bỏ qua khi
+                        import.</p>
                     <div class="table-responsive">
                         <table class="table table-bordered table-striped">
                             <thead class="table-light">
@@ -260,7 +283,8 @@
                                 <tr>
                                     <td><strong>Purch.Req.</strong></td>
                                     <td>Mã Phiếu (PR NO)</td>
-                                    <td>**Bắt buộc**. Các dòng có cùng mã này sẽ được nhóm thành một phiếu đề nghị riêng.</td>
+                                    <td>**Bắt buộc**. Các dòng có cùng mã này sẽ được nhóm thành một phiếu đề nghị riêng.
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>**A**</td>
@@ -295,12 +319,14 @@
                                 <tr>
                                     <td><strong>Created</strong></td>
                                     <td>Người tạo (SAP Created By)</td>
-                                    <td>**Mới thêm**. Thông tin người tạo phiếu trong hệ thống gốc (ví dụ: SAP). Sẽ lưu vào phiếu.</td>
+                                    <td>**Mới thêm**. Thông tin người tạo phiếu trong hệ thống gốc (ví dụ: SAP). Nếu trống,
+                                        sẽ lấy PR ID của người dùng đang import.</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Requisnr.</strong> (hoặc <strong>Requesting</strong>)</td>
                                     <td>Mã phòng đề nghị</td>
-                                    <td>**Bắt buộc**. Mã phòng ban yêu cầu (Executing Department). Ví dụ: 4900-23120. Hệ thống sẽ ưu tiên "Requisnr.".</td>
+                                    <td>**Bắt buộc**. Mã phòng ban yêu cầu (Executing Department). Ví dụ: 4900-23120. Hệ
+                                        thống sẽ ưu tiên "Requisnr.".</td>
                                 </tr>
                                 <tr>
                                     <td><strong>TrackingNo</strong></td>
@@ -315,12 +341,14 @@
                                 <tr>
                                     <td><strong>Req.Date</strong></td>
                                     <td>Ngày yêu cầu (SAP Request Date)</td>
-                                    <td>**Mới thêm**. Ngày PR được tạo/yêu cầu trong hệ thống gốc. Sẽ lưu vào phiếu. Định dạng **YYYY-MM-DD** hoặc Excel Date Number.</td>
-                                    </tr>
+                                    <td>**Mới thêm**. Ngày PR được tạo/yêu cầu trong hệ thống gốc. Sẽ lưu vào phiếu. Định
+                                        dạng **YYYY-MM-DD** hoặc Excel Date Number.</td>
+                                </tr>
                                 <tr>
                                     <td><strong>Deliv.dt</strong> (hoặc <strong>Deliv. Date</strong>)</td>
                                     <td>Ngày yêu cầu giao hàng</td>
-                                    <td>**Bắt buộc**. Định dạng **YYYY-MM-DD** hoặc Excel Date Number. Đây là ngày yêu cầu giao hàng chung cho phiếu. Hệ thống sẽ ưu tiên "Deliv.dt".</td>
+                                    <td>**Bắt buộc**. Định dạng **YYYY-MM-DD** hoặc Excel Date Number. Đây là ngày yêu cầu
+                                        giao hàng chung cho phiếu. Hệ thống sẽ ưu tiên "Deliv.dt".</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Quantity</strong></td>
@@ -330,7 +358,8 @@
                                 <tr>
                                     <td><strong>Total Val.</strong></td>
                                     <td>Tổng giá trị mặt hàng (Subtotal)</td>
-                                    <td>Tùy chọn, nhưng **được dùng để tính toán "Giá dự tính" (Estimated Price)** nếu cột "Estimated" không có.</td>
+                                    <td>Tùy chọn, nhưng **được dùng để tính toán "Giá dự tính" (Estimated Price)** nếu cột
+                                        "Estimated" không có.</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Un</strong> (hoặc <strong>Unit</strong>)</td>
@@ -340,17 +369,21 @@
                                 <tr>
                                     <td><strong>Crcy</strong> (hoặc <strong>Currency</strong>)</td>
                                     <td>Tiền tệ của phiếu</td>
-                                    <td>Tùy chọn. Mặc định là VND. (Sẽ lấy từ dòng đầu tiên của mỗi PR_NO). Hệ thống sẽ ưu tiên "Crcy".</td>
+                                    <td>Tùy chọn. Mặc định là VND. (Sẽ lấy từ dòng đầu tiên của mỗi PR_NO). Hệ thống sẽ ưu
+                                        tiên "Crcy".</td>
                                 </tr>
                                 <tr>
                                     <td><strong>PO Date</strong></td>
                                     <td>Ngày đặt hàng (PO Date)</td>
-                                    <td>**Mới thêm**. Ngày PO được tạo (nếu có). Sẽ lưu vào phiếu. Định dạng **YYYY-MM-DD** hoặc Excel Date Number.</td>
+                                    <td>**Mới thêm**. Ngày PO được tạo (nếu có). Sẽ lưu vào phiếu. Định dạng **YYYY-MM-DD**
+                                        hoặc Excel Date Number.</td>
                                 </tr>
                                 <tr>
                                     <td>**Estimated**</td>
                                     <td>Giá dự tính</td>
-                                    <td>Tùy chọn. Nếu cột này có và giá trị hợp lệ, nó sẽ được ưu tiên sử dụng. Nếu không có hoặc bằng 0, hệ thống sẽ cố gắng tính từ "Total Val." chia cho "Quantity". **Giá trị cuối cùng phải là số không âm.**</td>
+                                    <td>Tùy chọn. Nếu cột này có và giá trị hợp lệ, nó sẽ được ưu tiên sử dụng. Nếu không có
+                                        hoặc bằng 0, hệ thống sẽ cố gắng tính từ "Total Val." chia cho "Quantity". **Giá trị
+                                        cuối cùng phải là số không âm.**</td>
                                 </tr>
                                 <tr>
                                     <td>**Item**</td>
@@ -375,7 +408,9 @@
                                 <tr>
                                     <td>**[Không có trong Excel của bạn]**</td>
                                     <td>Mức độ ưu tiên (Priority)</td>
-                                    <td>Tùy chọn. Giá trị: 'urgent', 'normal', 'quotation_only'. Mặc định 'normal'. (Sẽ lấy từ dòng đầu tiên của mỗi PR_NO).</td>
+                                    <td>Tùy chọn. Giá trị: 'urgent', 'normal', 'quotation_only'. Mặc định 'normal'. (Sẽ lấy
+                                        từ dòng đầu tiên của mỗi PR_NO).</td>
+
                                 </tr>
                                 <tr>
                                     <td>**[Không có trong Excel của bạn]**</td>
@@ -387,13 +422,25 @@
                     </div>
                     <p class="text-danger">**Lưu ý quan trọng:**</p>
                     <ul>
-                        <li>Các cột **Purch.Req. (Mã phiếu)**, **Material (Mã hàng)**, **Short Text/Description (Tên hàng)**, **Requisnr./Requesting (Phòng đề nghị)**, **Quantity (Số lượng đặt)**, **Deliv.dt/Deliv. Date (Ngày yêu cầu giao hàng)** là **bắt buộc**.</li>
-                        <li>Nếu cột "Estimated" không có hoặc giá trị bằng 0, hệ thống sẽ cố gắng tính toán "Giá dự tính" từ "Total Val." chia cho "Quantity". Đảm bảo cung cấp đủ dữ liệu nếu bạn không có cột "Estimated".</li>
-                        <li>Nếu một trong các cột bắt buộc bị thiếu hoặc không hợp lệ, quá trình import phiếu đó sẽ bị bỏ qua và bạn sẽ nhận được cảnh báo.</li>
-                        <li>Đảm bảo rằng dữ liệu trong các cột ngày (Req.Date, Deliv.dt, PO Date) có định dạng **YYYY-MM-DD** hoặc là **Excel Date Number** để được chuyển đổi chính xác.</li>
-                        <li>Đảm bảo rằng dữ liệu trong các cột số (Quantity, Total Val., Estimated, Inventory Quantity, R3 Price) là định dạng số.</li>
+                        <li>Các cột **Purch.Req. (Mã phiếu)**, **Material (Mã hàng)**, **Short Text/Description (Tên
+                            hàng)**, **Requisnr./Requesting (Phòng đề nghị)**, **Quantity (Số lượng đặt)**,
+                            **Deliv.dt/Deliv. Date (Ngày yêu cầu giao hàng)** là **bắt buộc**.</li>
+                        <li>Nếu cột "Estimated" không có hoặc giá trị bằng 0, hệ thống sẽ cố gắng tính toán "Giá dự tính" từ
+                            "Total Val." chia cho "Quantity". Đảm bảo cung cấp đủ dữ liệu nếu bạn không có cột "Estimated".
+                        </li>
+                        <li>Nếu một trong các cột bắt buộc bị thiếu hoặc không hợp lệ, quá trình import phiếu đó sẽ bị bỏ
+                            qua và bạn sẽ nhận được cảnh báo.</li>
+                        <li>Đảm bảo rằng dữ liệu trong các cột ngày (Req.Date, Deliv.dt, PO Date) có định dạng
+                            **YYYY-MM-DD** hoặc là **Excel Date Number** để được chuyển đổi chính xác.</li>
+                        <li>Đảm bảo rằng dữ liệu trong các cột số (Quantity, Total Val., Estimated, Inventory Quantity, R3
+                            Price) là định dạng số.</li>
                         <li>Dòng đầu tiên của file Excel sẽ được xem là dòng tiêu đề và bị bỏ qua.</li>
-                        <li>Các giá trị cho các trường thông tin chung của phiếu (như Ngày yêu cầu giao hàng, Phòng ban yêu cầu, Tiền tệ, Mức độ ưu tiên, Ghi chú, Ngày yêu cầu SAP, Số PO, Ngày PO, Người tạo SAP) sẽ được lấy từ **dòng đầu tiên** của mỗi nhóm PR_NO trong file Excel.</li>
+                        <li>Các giá trị cho các trường thông tin chung của phiếu (như Ngày yêu cầu giao hàng, Phòng ban yêu
+                            cầu, Tiền tệ, Mức độ ưu tiên, Ghi chú, Ngày yêu cầu SAP, Số PO, Ngày PO, Người tạo SAP) sẽ được
+                            lấy từ **dòng đầu tiên** của mỗi nhóm PR_NO trong file Excel.</li>
+                        <li>Nếu bạn cung cấp **File đính kèm (ZIP)**, các file bên trong ZIP phải được đặt tên theo **Mã
+                            PR** (ví dụ: <code>1101532462.pdf</code>, <code>PR_1101532463.jpg</code>) để hệ thống tự động
+                            khớp và đính kèm.</li>
                     </ul>
                 </div>
                 <div class="modal-footer">
@@ -402,14 +449,13 @@
             </div>
         </div>
     </div>
-</div>
+    </div>
 
 @endsection
 
 @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        $(document).ready(function () {
+        $(document).ready(function() {
             let itemIndex = 0; // Dùng cho form tạo thủ công
 
             // Kích hoạt Select2
@@ -425,22 +471,30 @@
                 let totalOrderQty = 0;
                 let totalInventoryQty = 0;
 
-                $('#items-table-body tr').each(function () {
+                $('#items-table-body tr').each(function() {
                     const row = $(this);
                     const orderQty = parseFloat(row.find('.quantity-input').val()) || 0;
                     const inventoryQty = parseFloat(row.find('.inventory-quantity-input').val()) || 0;
                     const price = parseFloat(row.find('.price-input').val()) || 0;
                     const subtotal = orderQty * price;
 
-                    row.find('.subtotal-display').val(subtotal.toLocaleString('vi-VN', {minimumFractionDigits: 2}));
+                    row.find('.subtotal-display').val(subtotal.toLocaleString('vi-VN', {
+                        minimumFractionDigits: 2
+                    }));
                     grandTotal += subtotal;
                     totalOrderQty += orderQty;
                     totalInventoryQty += inventoryQty;
                 });
 
-                $('#total_amount_display').text(grandTotal.toLocaleString('vi-VN', {minimumFractionDigits: 2}));
-                $('#total-order-quantity-display').text(totalOrderQty.toLocaleString('vi-VN', {minimumFractionDigits: 3}));
-                $('#total-inventory-quantity-display').text(totalInventoryQty.toLocaleString('vi-VN', {minimumFractionDigits: 3}));
+                $('#total_amount_display').text(grandTotal.toLocaleString('vi-VN', {
+                    minimumFractionDigits: 2
+                }));
+                $('#total-order-quantity-display').text(totalOrderQty.toLocaleString('vi-VN', {
+                    minimumFractionDigits: 3
+                }));
+                $('#total-inventory-quantity-display').text(totalInventoryQty.toLocaleString('vi-VN', {
+                    minimumFractionDigits: 3
+                }));
 
                 $('#total_amount_hidden').val(grandTotal);
                 $('#total-order-quantity-hidden').val(totalOrderQty);
@@ -474,14 +528,14 @@
                 calculateTotals();
             }
 
-            $('#add-item-btn').on('click', function () {
+            $('#add-item-btn').on('click', function() {
                 createItemRow();
             });
 
-            $('#items-table-body').on('click', '.remove-item-btn', function () {
+            $('#items-table-body').on('click', '.remove-item-btn', function() {
                 if ($('#items-table-body tr').length > 1) {
                     $(this).closest('tr').remove();
-                    $('#items-table-body tr').each(function (index) {
+                    $('#items-table-body tr').each(function(index) {
                         $(this).find('td:first').text(index + 1);
                     });
                     itemIndex = $('#items-table-body tr').length;
@@ -491,12 +545,13 @@
                 }
             });
 
-            $('#items-table-body').on('input', '.quantity-input, .price-input, .inventory-quantity-input', function () {
-                calculateTotals();
-            });
+            $('#items-table-body').on('input', '.quantity-input, .price-input, .item-inventory-quantity-input',
+                function() {
+                    calculateTotals();
+                });
 
             // Kiểm tra dữ liệu trước khi gửi form (Client-side validation cho form tạo thủ công)
-            $('#pr-form').on('submit', function (e) {
+            $('#pr-form').on('submit', function(e) {
                 const itemRows = $('#items-table-body tr');
                 if (itemRows.length === 0) {
                     e.preventDefault();
@@ -505,11 +560,13 @@
                 }
 
                 let hasError = false;
-                itemRows.each(function (index) {
+                itemRows.each(function(index) {
                     const itemCode = $(this).find(`input[name="items[${index}][item_code]"]`).val();
                     const itemName = $(this).find(`input[name="items[${index}][item_name]"]`).val();
-                    const orderQuantity = parseFloat($(this).find(`input[name="items[${index}][order_quantity]"]`).val());
-                    const estimatedPrice = parseFloat($(this).find(`input[name="items[${index}][estimated_price]"]`).val());
+                    const orderQuantity = parseFloat($(this).find(
+                        `input[name="items[${index}][order_quantity]"]`).val());
+                    const estimatedPrice = parseFloat($(this).find(
+                        `input[name="items[${index}][estimated_price]"]`).val());
 
                     if (!itemCode) {
                         alert(`Mặt hàng ${index + 1}: Mã hàng là bắt buộc.`);
@@ -542,21 +599,18 @@
             });
 
             // --- Logic cho phần Import Excel (SỬA ĐỔI LỚN) ---
-            // Kích hoạt input file
+            // Nút "Đọc File Excel để Xem Trước" sẽ trigger việc gửi form qua AJAX
             $('#submit-import-excel-btn').on('click', function(e) {
-                e.preventDefault(); // Ngăn chặn submit form ngay lập tức
-                $('#excel_file').click(); // Kích hoạt input file
-            });
-
-            // Khi file được chọn, gửi AJAX request
-            $('#excel_file').on('change', function () {
-                const fileInput = this;
-                if (!fileInput.files || fileInput.files.length === 0) {
-                    return; // Không có file nào được chọn
-                }
+                e.preventDefault(); // Ngăn chặn submit form HTML mặc định
 
                 const form = $('#import-excel-form');
-                const formData = new FormData(form[0]); // Lấy form data bao gồm cả file
+                const fileInput = $('#excel_file')[0];
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    Swal.fire('Lỗi!', 'Vui lòng chọn file Excel để import.', 'error');
+                    return;
+                }
+
+                const formData = new FormData(form[0]); // Lấy form data bao gồm cả file Excel và file ZIP
 
                 Swal.fire({
                     title: 'Đang đọc file Excel...',
@@ -574,31 +628,14 @@
                     processData: false, // Không xử lý dữ liệu (để FormData hoạt động)
                     contentType: false, // Không đặt Content-Type (để trình duyệt tự đặt boundary cho FormData)
                     headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        'X-CSRF-TOKEN': $('meta[name="csrf-csrf-token"]').attr('content')
                     },
                     success: function(response) {
                         Swal.close(); // Đóng loading alert
 
                         if (response.success) {
-                            // Lưu messages vào session để hiển thị trên trang preview
-                            const messages = [];
-                            if (response.message) {
-                                messages.push({ type: 'success', text: response.message });
-                            }
-                            if (response.warnings && response.warnings.length > 0) {
-                                messages.push({ type: 'warning', text: 'Có cảnh báo khi đọc file:<br>' + response.warnings.join('<br>') });
-                            }
-                            // Lưu messages vào session (dùng AJAX, không thể dùng session() helper của Blade trực tiếp)
-                            // Cần một cách để truyền messages qua redirect
-                            // Có thể dùng local storage hoặc redirect với flash data qua backend
-                            // Tạm thời, tôi sẽ giả định backend sẽ xử lý việc flash messages và redirect
-                            // HOẶC, chuyển hướng trực tiếp và trang đích sẽ đọc URL params / session.
-                            // Để đơn giản, chúng ta sẽ dựa vào việc Laravel flash data qua session cho redirect.
-                            // Controller sẽ phải thêm session()->flash('imported_messages', $messages);
-
                             // Chuyển hướng đến trang xem trước
                             window.location.href = response.redirect_url;
-
                         } else {
                             let errorHtml = '';
                             if (response.message) {

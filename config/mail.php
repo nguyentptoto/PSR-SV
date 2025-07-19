@@ -41,7 +41,7 @@ return [
             'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => env('MAIL_TIMEOUT', null), // <-- THÊM DÒNG NÀY (hoặc chỉnh sửa nếu đã có)
             'auth_mode' => null,
         ],
 

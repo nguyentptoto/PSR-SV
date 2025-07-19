@@ -340,15 +340,143 @@ class PurchaseRequestController extends Controller
         return $approverQuery->get();
     }
 
-    public function importPreview(Request $request)
+     public function importPreview(Request $request)
     {
+        // GHI CÁC THÔNG TIN REQUEST VÀO LOG ĐỂ DEBUG
+        Log::info('--- Bắt đầu Debug ImportPreview Request ---');
+        Log::info('Toàn bộ dữ liệu request:', $request->all());
+        Log::info('Thông tin files được upload:', $request->files->all());
+
+        if ($request->hasFile('excel_file')) {
+            Log::info('Excel File Name:', [$request->file('excel_file')->getClientOriginalName()]);
+            Log::info('Excel File MimeType:', [$request->file('excel_file')->getMimeType()]);
+            Log::info('Excel File Size (bytes):', [$request->file('excel_file')->getSize()]);
+        }
+        if ($request->hasFile('attachment_zip_file')) {
+            Log::info('ZIP File Name:', [$request->file('attachment_zip_file')->getClientOriginalName()]);
+            Log::info('ZIP File MimeType:', [$request->file('attachment_zip_file')->getMimeType()]);
+            Log::info('ZIP File Size (bytes):', [$request->file('attachment_zip_file')->getSize()]);
+        }
+        Log::info('--- Kết thúc Debug ImportPreview Request ---');
+
+
         $request->validate([
             'excel_file' => 'required|file|mimes:xls,xlsx|max:10240',
+            'attachment_zip_file' => 'nullable|file|mimes:zip|max:51200', // Validate file ZIP (e.g., 50MB)
         ]);
 
         $import = new PurchaseRequestsImport();
+        $tempDirForAttachments = null; // Khởi tạo biến lưu thư mục tạm
+
         try {
+            Log::info('Before Excel import.'); // Debug: Trước khi import Excel
+            // Bước 1: Import dữ liệu từ Excel
             Excel::import($import, $request->file('excel_file'));
+            Log::info('After Excel import. Import errors: ', $import->getErrors()); // Debug: Sau khi import Excel
+            Log::info('After Excel import. Imported data count: ', [count($import->getImportedData())]);
+
+
+            $importErrors = $import->getErrors();
+            $importedData = $import->getImportedData();
+
+            if (empty($importedData)) {
+                $errors = $importErrors;
+                if (empty($errors)) {
+                    $errors[] = 'Không tìm thấy dữ liệu phiếu hợp lệ nào trong file Excel.';
+                }
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy dữ liệu phiếu hợp lệ nào trong file Excel.', 'errors' => $errors], 400);
+            }
+
+            // Bước 2: Xử lý file ZIP nếu có
+            $attachmentMap = []; // Map PIA_CODE => temporary_file_path
+            $tempDirForAttachments = null; // Đường dẫn đến thư mục tạm giải nén
+
+            Log::info('Checking for attachment_zip_file presence...'); // Debug: Kiểm tra sự hiện diện của ZIP
+
+            if ($request->hasFile('attachment_zip_file')) {
+                Log::info('attachment_zip_file is present. Starting ZIP processing.'); // Debug: ZIP có mặt, bắt đầu xử lý
+                $zipFile = $request->file('attachment_zip_file');
+                $tempDirForAttachments = 'pr_temp_attachments/' . Str::uuid()->toString();
+                Storage::disk('local')->makeDirectory($tempDirForAttachments); // Tạo thư mục tạm
+
+                Log::info('Attempting to open ZIP file: ' . $zipFile->getRealPath());
+
+                $zip = new ZipArchive;
+                if ($zip->open($zipFile->getRealPath()) === TRUE) {
+                    $zip->extractTo(Storage::disk('local')->path($tempDirForAttachments));
+                    $zip->close();
+                    Log::info('ZIP extracted to: ' . $tempDirForAttachments);
+
+                    // Đọc tất cả các file trong thư mục tạm và tạo map PIA_CODE -> path
+                    // Sử dụng allFiles() để duyệt qua các file trong thư mục con nếu có
+                    $extractedFiles = Storage::disk('local')->allFiles($tempDirForAttachments);
+                    Log::info('Extracted files list from temp dir: ', $extractedFiles);
+
+                    foreach ($extractedFiles as $filePath) {
+                        $fileNameWithoutExtension = pathinfo($filePath, PATHINFO_FILENAME);
+                        $fileExtension = pathinfo($filePath, PATHINFO_EXTENSION);
+
+                        // Đảm bảo không có khoảng trắng ở đầu/cuối tên file trước khi dùng regex
+                        $cleanedFileName = trim($fileNameWithoutExtension);
+                        Log::info("Processing extracted file: Filename: '{$cleanedFileName}'. Full path: {$filePath}"); // Debug: Xử lý file trích xuất
+
+                        // Cố gắng trích xuất PIA_CODE từ tên file
+                        // Regex: Bắt đầu chuỗi, tùy chọn PR_, sau đó 10+ chữ số (nhóm 1), tùy chọn gạch ngang/gạch dưới theo sau bất kỳ ký tự nào, kết thúc chuỗi.
+                        if (preg_match('/^(?:PR_)?(\d{10,})(?:[-_].*)?$/i', $cleanedFileName, $matches)) {
+                            $piaCodeFromFile = $matches[1]; // Lấy phần số là PIA_CODE
+                            // Kiểm tra trùng lặp: nếu có nhiều file cho cùng một PR_NO, chỉ lấy file đầu tiên hoặc theo quy tắc ưu tiên
+                            if (!isset($attachmentMap[$piaCodeFromFile])) {
+                                $attachmentMap[$piaCodeFromFile] = $filePath; // Lưu đường dẫn tạm
+                                Log::info("Matched file in ZIP: '{$cleanedFileName}' -> Extracted PIA Code: '{$piaCodeFromFile}'. Mapped Path: {$filePath}");
+                            } else {
+                                Log::warning("Đã tìm thấy nhiều file cho PR_NO {$piaCodeFromFile} trong ZIP. Chỉ lấy file đầu tiên: " . $attachmentMap[$piaCodeFromFile]);
+                            }
+                        } else {
+                            Log::warning("File trong ZIP không khớp định dạng PR_NO: Filename: '{$cleanedFileName}'. Path: {$filePath}. Regex did not match.");
+                        }
+                    }
+                    Log::info('Final attachment map created:', $attachmentMap);
+
+                } else {
+                    $zipError = $zip->status ? $zip->getStatusString() : 'Không xác định';
+                    Log::error("Không thể mở file ZIP hoặc giải nén lỗi. Lỗi ZIP: {$zipError}. Path: " . $zipFile->getRealPath());
+                    throw new \Exception('Không thể mở file ZIP hoặc giải nén lỗi: ' . $zipError);
+                }
+            } else {
+                Log::info('attachment_zip_file is NOT present. Skipping ZIP processing.'); // Debug: ZIP không có mặt
+            }
+
+
+            // Bước 3: Gán đường dẫn file đính kèm tạm vào dữ liệu phiếu
+            foreach ($importedData as &$prData) { // Dùng & để thay đổi trực tiếp mảng gốc
+                // Đảm bảo pia_code từ Excel cũng được trim() để khớp với piaCodeFromFile đã trim() trong regex
+                $excelPiaCode = trim($prData['pia_code']);
+                $prData['temporary_attachment_path'] = $attachmentMap[$excelPiaCode] ?? null;
+                Log::info("Mapping attachment for PR: '{$excelPiaCode}'. Found in map: " . ($prData['temporary_attachment_path'] ? 'Yes' : 'No') . ". Mapped path: " . ($prData['temporary_attachment_path'] ?? 'N/A'));
+            }
+            unset($prData); // Xóa tham chiếu sau vòng lặp
+
+            // Bước 4: Lưu dữ liệu đã import (bao gồm đường dẫn file tạm) vào session
+            $sessionId = Str::uuid()->toString();
+            // Lưu cả đường dẫn thư mục tạm cho việc cleanup sau này
+            $sessionData = [
+                'purchase_requests' => $importedData,
+                'temp_attachments_dir' => $tempDirForAttachments // Lưu đường dẫn thư mục tạm
+            ];
+            $request->session()->put('imported_purchase_requests_' . $sessionId, $sessionData);
+
+
+            // Flash messages to session for the redirect
+            $messagesToFlash = [];
+            if (!empty($importErrors)) {
+                $messagesToFlash[] = ['type' => 'warning', 'text' => 'Đã đọc file Excel, nhưng có cảnh báo:<br>' . implode('<br>', $importErrors)];
+            } else {
+                $messagesToFlash[] = ['type' => 'success', 'text' => 'Đọc file Excel thành công! Vui lòng kiểm tra các phiếu trước khi tạo.'];
+            }
+            $request->session()->flash('imported_messages', $messagesToFlash);
+
+            return response()->json(['success' => true, 'message' => 'Đọc file Excel thành công! Chuyển đến trang xem trước.', 'redirect_url' => route('users.purchase-requests.import-preview', ['session_id' => $sessionId])]);
+
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             $failures = $e->failures();
             $errors = [];
@@ -357,60 +485,47 @@ class PurchaseRequestController extends Controller
             }
             return response()->json(['success' => false, 'message' => 'Lỗi validation khi đọc file Excel.', 'errors' => $errors], 422);
         } catch (\Exception $e) {
+            // Đảm bảo thư mục tạm được xóa nếu có lỗi trước khi lưu vào session
+            if ($tempDirForAttachments && Storage::disk('local')->exists($tempDirForAttachments)) {
+                Storage::disk('local')->deleteDirectory($tempDirForAttachments);
+            }
             Log::error("Error importing purchase requests excel file for preview: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['success' => false, 'message' => 'Đã xảy ra lỗi khi đọc file Excel: ' . $e->getMessage(), 'errors' => []], 500);
         }
-
-        $importErrors = $import->getErrors();
-        $importedData = $import->getImportedData();
-
-        if (empty($importedData)) {
-            $errors = $importErrors;
-            if (empty($errors)) {
-                $errors[] = 'Không tìm thấy dữ liệu phiếu hợp lệ nào trong file Excel.';
-            }
-            return response()->json(['success' => false, 'message' => 'Không tìm thấy dữ liệu phiếu hợp lệ nào trong file Excel.', 'errors' => $errors], 400);
-        }
-
-        $sessionId = Str::uuid()->toString();
-        $request->session()->put('imported_purchase_requests_' . $sessionId, $importedData);
-
-        // Flash messages to session for the redirect
-        $messagesToFlash = [];
-        if (!empty($importErrors)) {
-            $messagesToFlash[] = ['type' => 'warning', 'text' => 'Đã đọc file Excel, nhưng có cảnh báo:<br>' . implode('<br>', $importErrors)];
-        } else {
-            $messagesToFlash[] = ['type' => 'success', 'text' => 'Đọc file Excel thành công! Vui lòng kiểm tra các phiếu trước khi tạo.'];
-        }
-        $request->session()->flash('imported_messages', $messagesToFlash);
-
-
-        return response()->json(['success' => true, 'message' => 'Đọc file Excel thành công! Chuyển đến trang xem trước.', 'redirect_url' => route('users.purchase-requests.import-preview', ['session_id' => $sessionId])]);
     }
 
-    public function showImportPreview(Request $request)
+     public function showImportPreview(Request $request)
     {
         $sessionId = $request->query('session_id');
-        if (!$sessionId || !$request->session()->has('imported_purchase_requests_' . $sessionId)) {
+        $sessionData = $request->session()->get('imported_purchase_requests_' . $sessionId);
+
+        if (!$sessionId || !$sessionData) {
             return redirect()->route('users.purchase-requests.create')->with('error', 'Không tìm thấy dữ liệu xem trước hoặc phiên làm việc đã hết hạn. Vui lòng import lại.');
         }
 
-        $importedPurchaseRequests = $request->session()->get('imported_purchase_requests_' . $sessionId);
+        $importedPurchaseRequests = $sessionData['purchase_requests'];
+        $tempAttachmentsDir = $sessionData['temp_attachments_dir']; // Lấy đường dẫn thư mục tạm
 
         $executingDepartments = ExecutingDepartment::orderBy('name')->get();
         $user = Auth::user();
 
-        return view('users.purchase_requests.import_preview', compact('importedPurchaseRequests', 'executingDepartments', 'user', 'sessionId'));
+        // Pass tempAttachmentsDir to the view if needed for client-side processing/display (e.g., direct links if accessible)
+        // For security, do not make these temporary files publicly accessible via direct URLs.
+        return view('users.purchase_requests.import_preview', compact('importedPurchaseRequests', 'executingDepartments', 'user', 'sessionId', 'tempAttachmentsDir'));
     }
 
-    public function createFromImport(Request $request)
+     public function createFromImport(Request $request)
     {
         $sessionId = $request->input('session_id');
-        if (!$sessionId || !$request->session()->has('imported_purchase_requests_' . $sessionId)) {
+        $sessionData = $request->session()->get('imported_purchase_requests_' . $sessionId);
+
+        if (!$sessionId || !$sessionData) {
             return response()->json(['success' => false, 'message' => 'Phiên làm việc đã hết hạn hoặc dữ liệu không tồn tại. Vui lòng import lại.'], 400);
         }
 
-        $importedPurchaseRequests = $request->session()->get('imported_purchase_requests_' . $sessionId);
+        $importedPurchaseRequests = $sessionData['purchase_requests'];
+        $tempAttachmentsDir = $sessionData['temp_attachments_dir'];
+
         $createdCount = 0;
         $failedCount = 0;
         $errors = [];
@@ -420,6 +535,7 @@ class PurchaseRequestController extends Controller
         $branch = $requester->mainBranch;
         $section = $requester->sections->first();
 
+        // Lấy lại các PIA codes từ DB một lần nữa để tránh race condition
         $existingPiaCodes = PurchaseRequest::whereIn('pia_code', collect($importedPurchaseRequests)->pluck('pia_code')->toArray())
             ->pluck('pia_code')
             ->toArray();
@@ -436,12 +552,27 @@ class PurchaseRequestController extends Controller
             $prData['section_id'] = $section->id;
 
             $itemsData = $prData['items'];
+            $temporaryAttachmentPath = $prData['temporary_attachment_path'] ?? null; // Lấy đường dẫn tạm của file đính kèm
+
             unset($prData['items']);
+            unset($prData['temporary_attachment_path']); // Xóa khỏi prData trước khi tạo PurchaseRequest
 
             DB::beginTransaction();
             try {
                 $purchaseRequest = PurchaseRequest::create($prData);
                 $purchaseRequest->items()->createMany($itemsData);
+
+                // Di chuyển file đính kèm tạm sang thư mục vĩnh viễn
+                if ($temporaryAttachmentPath && Storage::disk('local')->exists($temporaryAttachmentPath)) {
+                    $fileName = pathinfo($temporaryAttachmentPath, PATHINFO_BASENAME);
+                    $newAttachmentPath = 'pr_attachments/' . $purchaseRequest->pia_code . '_' . time() . '.' . pathinfo($fileName, PATHINFO_EXTENSION);
+
+                    // Copy từ local disk (temp) sang public disk (permanent)
+                    Storage::disk('public')->put($newAttachmentPath, Storage::disk('local')->get($temporaryAttachmentPath));
+
+                    // Cập nhật đường dẫn file đính kèm vào phiếu PR
+                    $purchaseRequest->update(['attachment_path' => $newAttachmentPath]);
+                }
 
                 ApprovalHistory::create([
                     'purchase_request_id' => $purchaseRequest->id,
@@ -468,6 +599,10 @@ class PurchaseRequestController extends Controller
             }
         }
 
+        // Bước cuối: Xóa thư mục tạm chứa file đính kèm (nếu tồn tại) và session data
+        if ($tempAttachmentsDir && Storage::disk('local')->exists($tempAttachmentsDir)) {
+            Storage::disk('local')->deleteDirectory($tempAttachmentsDir);
+        }
         $request->session()->forget('imported_purchase_requests_' . $sessionId);
 
         $message = "Đã tạo thành công {$createdCount} phiếu đề nghị.";
@@ -483,6 +618,7 @@ class PurchaseRequestController extends Controller
             'redirect_url' => route('users.purchase-requests.index')
         ]);
     }
+
     /**
      * ✅ THÊM MỚI: Xử lý in hàng loạt các phiếu đề nghị ra file PDF (được nén trong ZIP).
      */

@@ -110,7 +110,31 @@
                             <input class="form-check-input" type="checkbox" value="1" name="prs[{{ $prIndex }}][requires_director_approval]" {{ $prData['requires_director_approval'] ? 'checked' : '' }}>
                             <label class="form-check-label"><strong>Yêu cầu Giám đốc (Cấp 4) duyệt</strong></label>
                         </div>
-
+                         {{-- THÊM PHẦN HIỂN THỊ FILE ĐÍNH KÈM Ở ĐÂY --}}
+                        <div class="form-group mt-3">
+                            <label>File đính kèm</label>
+                            @if ($prData['temporary_attachment_path'])
+                                @php
+                                    $fileName = pathinfo($prData['temporary_attachment_path'], PATHINFO_BASENAME);
+                                    // Kiểm tra loại file để hiển thị icon phù hợp
+                                    $fileExtension = pathinfo($fileName, PATHINFO_EXTENSION);
+                                    $iconClass = 'fas fa-file';
+                                    if (in_array($fileExtension, ['pdf'])) $iconClass = 'fas fa-file-pdf';
+                                    else if (in_array($fileExtension, ['doc', 'docx'])) $iconClass = 'fas fa-file-word';
+                                    else if (in_array($fileExtension, ['xls', 'xlsx'])) $iconClass = 'fas fa-file-excel';
+                                    else if (in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif'])) $iconClass = 'fas fa-file-image';
+                                    else if (in_array($fileExtension, ['zip'])) $iconClass = 'fas fa-file-archive';
+                                @endphp
+                                <p class="form-control-static">
+                                    <i class="{{ $iconClass }}"></i> <strong>{{ $fileName }}</strong> (sẽ được đính kèm)
+                                </p>
+                                {{-- Có thể thêm input hidden để truyền lại đường dẫn tạm nếu muốn chỉnh sửa/xóa ở client --}}
+                                <input type="hidden" name="prs[{{ $prIndex }}][temporary_attachment_path]" value="{{ $prData['temporary_attachment_path'] }}">
+                            @else
+                                <p class="form-control-static text-muted">Không có file đính kèm khớp với Mã PR này trong file ZIP.</p>
+                                <input type="hidden" name="prs[{{ $prIndex }}][temporary_attachment_path]" value="">
+                            @endif
+                        </div>
 
                         <h5 class="mt-4">Chi tiết hàng hóa</h5>
                         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">

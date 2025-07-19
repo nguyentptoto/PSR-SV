@@ -153,3 +153,18 @@ ul.dropdown-menu.dropdown-menu-lg.dropdown-menu-end.show {
     padding-top: 1rem;
     margin-top: 1rem;
 }
+
+/* Tùy chỉnh select box cho đẹp hơn */
+#google_translate_element select {
+    background-color: #f8f9fa; /* Màu nền giống header */
+    color: #333;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 5px 8px;
+    margin: 0;
+    font-family: inherit; /* Sử dụng font của trang */
+}
+/* Ẩn banner "Powered by Google" bên trên */
+.goog-te-banner-frame.skiptranslate {
+    display: none !important;
+}

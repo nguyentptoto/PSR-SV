@@ -12,8 +12,10 @@
 <script src="{{ asset('js/sweetalert2.all.min.js') }}"></script>
 <script src="{{ asset('js/select2.min.js') }}"></script>
 <!--end::Required Plugin(Bootstrap 5)--><!--begin::Required Plugin(AdminLTE)-->
+
 <script src="{{ asset('js/adminlte.js') }}"></script>
 <script src="{{ asset('js/app.js') }}"></script>
+
 <script src="{{ asset('js/xlsx.full.min.js') }}"></script>
 <!--end::Required Plugin(AdminLTE)--><!--begin::OverlayScrollbars Configure-->
 @stack('scripts')

@@ -43,7 +43,7 @@
                                 <span class="info-box-icon bg-success"><i class="bi bi-telephone-fill"></i></span>
                                 <div class="info-box-content">
                                     <span class="info-box-text">Hotline</span>
-                                    <span class="info-box-number">0984118535</span>
+                                    <a href="tel:0984118535">0984118535</a>
                                 </div>
                             </div>
                         </div>

@@ -21,7 +21,10 @@
                             <img src="{{ asset('assets/img/logo.png') }}" class="logo-image" alt="Logo">
                         </a>
                     </li>
-
+                    {{-- Thêm đoạn này để chứa thanh dịch --}}
+<li class="nav-item d-flex align-items-center me-2">
+    <div id="google_translate_element"></div>
+</li>
                     <li class="nav-item dropdown user-menu">
                         <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
                             {{ Auth::user()->name }}
@@ -80,7 +83,22 @@
 
     @include('script')
     @include('admin._partials.toast')
+<script type="text/javascript">
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({
+    // Ngôn ngữ gốc của trang web của bạn
+    pageLanguage: 'vi',
+    // Chỉ định các ngôn ngữ bạn muốn hiển thị trong danh sách
+    includedLanguages: 'en,ja,ko,zh-CN,fr',
+    // Giao diện: ngang, dọc, hoặc chỉ có icon
+    layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+    // Tự động ẩn banner của Google sau khi dịch
+    autoDisplay: false
+  }, 'google_translate_element');
+}
+</script>
 
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>
 
 </html>
