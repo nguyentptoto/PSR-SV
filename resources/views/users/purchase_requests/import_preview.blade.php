@@ -76,6 +76,15 @@
                                 <label>Ngày yêu cầu giao hàng*</label>
                                 <input type="date" name="prs[{{ $prIndex }}][requested_delivery_date]" class="form-control" value="{{ $prData['requested_delivery_date'] }}" required>
                             </div>
+                             <div class="col-md-4 form-group">
+                                <label for="priority_{{ $prIndex }}">Mức độ ưu tiên</label>
+                                <select name="prs[{{ $prIndex }}][priority]" id="priority_{{ $prIndex }}" class="form-control">
+                                    <option value="">-- Chọn mức độ --</option>
+                                    <option value="normal" {{ ($prData['priority'] ?? old('priority')) == 'normal' ? 'selected' : '' }}>Normal/Bình thường</option>
+                                    <option value="urgent" {{ ($prData['priority'] ?? old('priority')) == 'urgent' ? 'selected' : '' }}>Urgent/Khẩn cấp</option>
+                                    <option value="quotation_only" {{ ($prData['priority'] ?? old('priority')) == 'quotation_only' ? 'selected' : '' }}>Quotation only/Báo giá</option>
+                                </select>
+                            </div>
                             <div class="col-md-4 form-group">
                                 <label>Tiền tệ</label>
                                 <select name="prs[{{ $prIndex }}][currency]" class="form-control" required>

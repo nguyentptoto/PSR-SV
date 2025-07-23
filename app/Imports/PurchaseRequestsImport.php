@@ -60,6 +60,8 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                                             ->toArray();
 
         foreach ($groupedItems as $piaCode => $items) {
+            $priority = (string)($firstItemRow['priority'] ?? null); // <-- CẬP NHẬT DÒNG NÀY
+
             // Bỏ qua nếu PR_NO trống hoặc đã tồn tại
             if (empty($piaCode)) {
                 $this->errors[] = "Dữ liệu chứa một nhóm mặt hàng không có 'PR_NO' (cột 'Purch.Req.' hoặc tương đương). Nhóm này sẽ bị bỏ qua.";
@@ -156,7 +158,7 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                 'requested_delivery_date' => $requestedDeliveryDate->format('Y-m-d'),
                 'currency' => $currency,
                 'requires_director_approval' => false,
-                'priority' => 'normal',
+                'priority' => $priority,
                 'remarks' => null,
                 'attachment_path' => null,
                 'status' => 'pending_approval',
