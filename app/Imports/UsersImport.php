@@ -41,33 +41,36 @@ class UsersImport implements ToCollection, WithHeadingRow
                 $prsId = trim($row['sap_user_id']);
 
                 if (empty($employeeId)) {
-                    return;
+                    return; // Bỏ qua nếu không có employeeId
                 }
 
                 $mainBranchId = $branches[trim($row['chi_nhanh_chinh'])] ?? null;
                 if (!$mainBranchId) {
-                    return;
+                    // Bạn có thể log lỗi ở đây nếu muốn
+                    return; // Bỏ qua nếu không tìm thấy chi nhánh
                 }
 
                 $jobTitleId = $jobTitles[trim($row['phan_quyen_tren_sap'])] ?? null;
 
-                // ✅ SỬA ĐỔI: Logic xử lý ảnh chữ ký để giữ nguyên tên file
+                // ✅ PHẦN SỬA ĐỔI: Xử lý ảnh chữ ký để giữ nguyên tên file gốc
                 $signatureDbPath = null;
                 if ($this->signaturesPath && !empty($employeeId)) {
-                    // Tìm file ảnh không phân biệt extension (png, jpg, jpeg)
+                    // Tìm file ảnh có tên là employeeId và phần mở rộng bất kỳ (png, jpg, jpeg...)
                     $signatureFiles = File::glob($this->signaturesPath . '/' . $employeeId . '.*');
 
                     if (!empty($signatureFiles)) {
-                        $imageFile = new IlluminateFile($signatureFiles[0]);
+                        // Lấy file đầu tiên tìm được
+                        $originalFile = new IlluminateFile($signatureFiles[0]);
 
-                        // Lấy tên file gốc (ví dụ: M012345.png)
-                        $newFileName = $imageFile->getBasename();
+                        // Lấy tên file gốc bao gồm cả phần mở rộng (ví dụ: 'M012344.png')
+                        $originalFileName = $originalFile->getBasename();
 
-                        // Sử dụng putFileAs để lưu với tên file tùy chỉnh
+                        // Sử dụng putFileAs để lưu file với tên gốc vào thư mục 'signatures' trên disk 'public'
+                        // Hàm này sẽ trả về đường dẫn tương đối, ví dụ: 'signatures/M012344.png'
                         $path = Storage::disk('public')->putFileAs(
-                            'signatures', // Thư mục lưu
-                            $imageFile,   // File cần lưu
-                            $newFileName  // Tên file mới
+                            'signatures',     // Thư mục lưu trữ
+                            $originalFile,    // File object cần lưu
+                            $originalFileName // Tên file mong muốn
                         );
 
                         $signatureDbPath = $path;
@@ -83,6 +86,8 @@ class UsersImport implements ToCollection, WithHeadingRow
                     'main_branch_id' => $mainBranchId,
                     'status' => true,
                 ];
+
+                // Chỉ thêm đường dẫn ảnh vào dữ liệu nếu upload thành công
                 if ($signatureDbPath) {
                     $userData['signature_image_path'] = $signatureDbPath;
                 }
@@ -96,23 +101,25 @@ class UsersImport implements ToCollection, WithHeadingRow
                             })->first();
 
                 if ($user) {
-                    $userData['employee_id'] = $employeeId;
+                    // Nếu tìm thấy user, cập nhật thông tin
+                    $userData['employee_id'] = $employeeId; // Đảm bảo employee_id không bị ghi đè nếu user được tìm bằng prs_id
                     $user->update($userData);
                 } else {
+                    // Nếu không tìm thấy, tạo user mới
                     $userData['employee_id'] = $employeeId;
-                    $userData['password'] = Hash::make('12345678');
+                    $userData['password'] = Hash::make('12345678'); // Mật khẩu mặc định
                     $user = User::create($userData);
                 }
 
-                // Gán phòng ban
+                // Gán phòng ban (sections)
                 if (!empty($row['department'])) {
                     $sectionCodes = explode(',', $row['department']);
                     $sectionIds = collect($sectionCodes)->map(fn($code) => $sections[trim($code)] ?? null)->filter();
                     $user->sections()->sync($sectionIds);
                 }
 
-                // Gán quyền hạn
-                $user->assignments()->delete();
+                // Gán quyền hạn (assignments)
+                $user->assignments()->delete(); // Xóa các assignment cũ trước khi gán mới
                 if (!empty($row['phan_cap']) && !empty($row['group'])) {
                      $assignmentGroupId = $groups[trim($row['group'])] ?? null;
                      $assignmentRankId = $ranks[$row['phan_cap']] ?? null;
@@ -120,10 +127,10 @@ class UsersImport implements ToCollection, WithHeadingRow
                          $allBranches = Branch::all();
                          foreach($allBranches as $branch) {
                              Assignment::create([
-                                'user_id' => $user->id,
-                                'branch_id' => $branch->id,
-                                'approval_rank_id' => $assignmentRankId,
-                                'group_id' => $assignmentGroupId,
+                                 'user_id' => $user->id,
+                                 'branch_id' => $branch->id,
+                                 'approval_rank_id' => $assignmentRankId,
+                                 'group_id' => $assignmentGroupId,
                              ]);
                          }
                      }

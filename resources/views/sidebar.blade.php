@@ -1,6 +1,6 @@
  <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark"> <!--begin::Sidebar Brand-->
      <div class="sidebar-brand"> <!--begin::Brand Link--> <a href="{{ route('dashboard') }}" class="brand-link">
-             <!--begin::Brand Image--> <img src="{{ asset('assets/img/logo.png') }}" alt="Logo admin"
+             <!--begin::Brand Image--> <img src="{{ asset('assets/img/logo1.svg') }}" alt="Logo admin"
                  class="brand-image opacity-75 shadow"> </a> </div>
      <!--end::Sidebar Brand--> <!--begin::Sidebar Wrapper-->
      <div class="sidebar-wrapper">

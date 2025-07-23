@@ -19,11 +19,7 @@
                 </ul>
 
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a href="#" class="nav-link logo-link">
-                            <img src="{{ asset('assets/img/logo.png') }}" class="logo-image" alt="Logo">
-                        </a>
-                    </li>
+
                     {{-- Thêm đoạn này để chứa thanh dịch --}}
 <li class="nav-item d-flex align-items-center me-2">
     <div id="google_translate_element"></div>
