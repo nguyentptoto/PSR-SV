@@ -17,5 +17,6 @@
 <script src="{{ asset('js/app.js') }}"></script>
 
 <script src="{{ asset('js/xlsx.full.min.js') }}"></script>
+<script src="{{ asset('js/ripples.js') }}"></script>
 <!--end::Required Plugin(AdminLTE)--><!--begin::OverlayScrollbars Configure-->
 @stack('scripts')

@@ -619,9 +619,7 @@ class PurchaseRequestController extends Controller
         ]);
     }
 
-    /**
-     * ✅ THÊM MỚI: Xử lý in hàng loạt các phiếu đề nghị ra file PDF (được nén trong ZIP).
-     */
+
 
     public function bulkExportPdf(Request $request)
     {

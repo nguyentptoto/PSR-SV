@@ -264,30 +264,3 @@
 
 
 @endsection
-
-@push('scripts')
-    {{-- ✅ THÊM MỚI: Script để xử lý các modals --}}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const approveModal = document.getElementById('approveModal');
-            if (approveModal) {
-                approveModal.addEventListener('show.bs.modal', event => {
-                    const button = event.relatedTarget;
-                    const actionUrl = button.getAttribute('data-action-url');
-                    const form = approveModal.querySelector('#approve-form');
-                    form.setAttribute('action', actionUrl);
-                });
-            }
-
-            const rejectModal = document.getElementById('rejectModal');
-            if (rejectModal) {
-                rejectModal.addEventListener('show.bs.modal', event => {
-                    const button = event.relatedTarget;
-                    const actionUrl = button.getAttribute('data-action-url');
-                    const form = rejectModal.querySelector('#reject-form');
-                    form.setAttribute('action', actionUrl);
-                });
-            }
-        });
-    </script>
-@endpush

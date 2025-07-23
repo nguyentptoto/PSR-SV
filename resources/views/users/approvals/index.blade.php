@@ -135,7 +135,31 @@
     </div>
 </div>
 
-
+{{-- ✅ BỔ SUNG: Modal Xác nhận Duyệt --}}
+<div class="modal fade" id="approveModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Xác nhận Phê duyệt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="approve-form" method="POST" action="">
+          @csrf
+          <div class="modal-body">
+              <p>Bạn có chắc chắn muốn phê duyệt phiếu này không?</p>
+              <div class="mb-3">
+                  <label for="approve_comment" class="form-label">Ghi chú (tùy chọn):</label>
+                  <textarea class="form-control" id="approve_comment" name="comment" rows="3"></textarea>
+              </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+            <button type="submit" class="btn btn-success">Xác nhận Duyệt</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
 <div class="modal fade" id="rejectModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">

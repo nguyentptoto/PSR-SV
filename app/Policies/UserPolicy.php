@@ -75,4 +75,9 @@ class UserPolicy
             $query->where('rank_level', 0);
         })->exists();
     }
+    public function toggleStatus(User $currentUser, User $targetUser)
+    {
+        // Trả về false (từ chối) nếu người dùng đang cố gắng thay đổi trạng thái của chính họ
+        return $currentUser->getKey() !== $targetUser->getKey();
+    }
 }

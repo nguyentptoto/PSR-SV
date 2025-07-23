@@ -4,6 +4,9 @@
 @include('head')
 
 <body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
+
+     <div class="cursor-dot"></div>
+    <div class="cursor-outline"></div>
     <div class="app-wrapper">
         <nav class="app-header navbar navbar-expand bg-body">
             <div class="container-fluid">

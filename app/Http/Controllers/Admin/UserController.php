@@ -169,21 +169,22 @@ public function show(User $user)
     ]);
 
     // Lấy danh sách group_id và rank_level cao nhất của người dùng hiện tại
-    $userGroupIds = $user->assignments->pluck('group_id')->unique()->toArray();
-    $userMaxRankLevel = $user->assignments->pluck('approvalRank.rank_level')->max() ?? 0;
+    $userAssignments = $user->assignments;
+    $userGroupIds = $userAssignments->pluck('group_id')->unique()->toArray();
+    $userMaxRankLevel = $userAssignments->pluck('approvalRank.rank_level')->max() ?? 0;
 
     // Nếu không có group_id, trả về collection rỗng
-    if (empty($userGroupIds)) {
+    if (empty($userGroupIds) || !$user->main_branch_id) {
         $purchasingSuperiors = collect([]);
         $requestingSuperiors = collect([]);
-        \Log::info('No group IDs for user:', ['user_id' => $user->id]);
         return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
     }
 
-    // Lấy danh sách cấp trên có cùng group_id và rank_level > userMaxRankLevel
+    // Lấy danh sách cấp trên có cùng group_id, cùng chi nhánh và rank_level > userMaxRankLevel
     $superiors = User::where('id', '!=', $user->id) // Loại trừ người dùng hiện tại
-        ->whereHas('assignments', function ($query) use ($userGroupIds, $userMaxRankLevel) {
+        ->whereHas('assignments', function ($query) use ($userGroupIds, $userMaxRankLevel, $user) { // Thêm $user vào
             $query->whereIn('group_id', $userGroupIds)
+                  ->where('branch_id', $user->main_branch_id) // Lọc theo chi nhánh của người dùng
                   ->whereHas('approvalRank', function ($subQuery) use ($userMaxRankLevel) {
                       $subQuery->where('rank_level', '>', $userMaxRankLevel);
                   });
@@ -195,8 +196,10 @@ public function show(User $user)
 
     foreach ($superiors as $superior) {
         foreach ($superior->assignments as $assignment) {
-            if (in_array($assignment->group_id, $userGroupIds) && $assignment->approvalRank && $assignment->approvalRank->rank_level > $userMaxRankLevel) {
+            // Chỉ xét những assignment cùng chi nhánh và có cấp bậc cao hơn
+            if ($assignment->branch_id == $user->main_branch_id && in_array($assignment->group_id, $userGroupIds) && $assignment->approvalRank && $assignment->approvalRank->rank_level > $userMaxRankLevel) {
                 $rankName = $assignment->approvalRank->name ?? 'Không xác định';
+
                 if ($assignment->group_id == 1) { // Phòng Đề Nghị
                     if (!isset($requestingSuperiors[$rankName])) {
                         $requestingSuperiors[$rankName] = collect([]);
@@ -216,12 +219,16 @@ public function show(User $user)
         }
     }
 
-    // Debug dữ liệu
-    \Log::info('User Group IDs:', $userGroupIds);
-    \Log::info('User Max Rank Level:', [$userMaxRankLevel]);
-    \Log::info('Superiors:', $superiors->toArray());
-    \Log::info('Requesting Superiors:', $requestingSuperiors->toArray());
-    \Log::info('Purchasing Superiors:', $purchasingSuperiors->toArray());
+    // Sắp xếp các cấp bậc theo rank_level
+    $rankOrder = ApprovalRank::orderBy('rank_level')->pluck('name')->flip();
+
+    $requestingSuperiors = $requestingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
+        return $rankOrder[$rankName] ?? 999;
+    });
+
+    $purchasingSuperiors = $purchasingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
+        return $rankOrder[$rankName] ?? 999;
+    });
 
     return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
 }
@@ -381,6 +388,25 @@ public function show(User $user)
             return back()->with('success', 'Import danh sách người dùng thành công!');
         } else {
             return back()->with('error', 'Không thể mở file ZIP.');
+        }
+    }
+      public function toggleStatus(User $user)
+    {
+        // Kiểm tra quyền hạn, ví dụ: không cho admin tự khóa tài khoản của mình
+        $this->authorize('toggleStatus', $user);
+
+        try {
+            // Đảo ngược trạng thái hiện tại (nếu 1 -> 0, nếu 0 -> 1)
+            $user->status = !$user->status;
+            $user->save();
+
+            $message = $user->status ? 'Kích hoạt tài khoản thành công.' : 'Vô hiệu hóa tài khoản thành công.';
+
+            return redirect()->route('admin.users.index')->with('success', $message);
+
+        } catch (\Exception $e) {
+            Log::error('Lỗi khi thay đổi trạng thái người dùng: ' . $e->getMessage());
+            return back()->with('error', 'Đã xảy ra lỗi khi thay đổi trạng thái người dùng.');
         }
     }
 }

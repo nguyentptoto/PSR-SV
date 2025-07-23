@@ -26,7 +26,16 @@
         crossorigin="anonymous"><!--end::Third Party Plugin(Bootstrap Icons)--><!--begin::Required Plugin(AdminLTE)-->
     <link rel="stylesheet" href="{{ asset('css/adminlte.css') }}">
     <!--end::Required Plugin(AdminLTE)--><!-- apexcharts -->
-
+  <script>
+       (function() {
+            if (localStorage.getItem('loginTheme') === 'animated') {
+                document.documentElement.classList.add('theme-animated');
+            }
+            if (localStorage.getItem('loginNightMode') === 'true') {
+                document.documentElement.classList.add('theme-night');
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.37.1/dist/apexcharts.css"
         integrity="sha256-4MX+61mt9NVvvuPjUWdUdyfZfxSB1/Rf9WtqRHgG5S0=" crossorigin="anonymous">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icon-css/3.5.0/css/flag-icon.min.css">
