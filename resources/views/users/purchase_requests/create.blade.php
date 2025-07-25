@@ -167,7 +167,7 @@
                                 <th style="width: 10%;">Mã hàng*</th>
                                 <th style="width: 15%;">Tên hàng*</th>
                                 <th style="width: 10%;">Mã hàng cũ</th>
-                                <th style="width: 10%;">Mã hàng phụ</th>
+
                                 <th style="width: 7%;">SL Đặt*</th>
                                 <th style="width: 5%;">ĐV Đặt</th>
                                 <th style="width: 7%;">SL Kho</th>
@@ -177,7 +177,6 @@
                                 <th style="width: 10%;">Thành tiền</th>
                                 <th style="width: 8%;">Mã phòng SD</th>
                                 <th style="width: 8%;">Plant hệ</th>
-                                <th style="width: 8%;">Nhóm mua hàng</th>
                                 <th style="width: 3%;"></th>
                             </tr>
                         </thead>
@@ -286,21 +285,13 @@
                                     <td>**Bắt buộc**. Các dòng có cùng mã này sẽ được nhóm thành một phiếu đề nghị riêng.
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td>**A**</td>
-                                    <td>Mã hàng phụ (Legacy Item Code)</td>
-                                    <td>**Mới thêm**. Sẽ được lưu vào chi tiết mặt hàng.</td>
-                                </tr>
+
                                 <tr>
                                     <td><strong>Plnt</strong> (hoặc <strong>Plant</strong>)</td>
                                     <td>Mã Plant</td>
                                     <td>Ví dụ: 4910. Hệ thống sẽ ưu tiên "Plnt" nếu có.</td>
                                 </tr>
-                                <tr>
-                                    <td><strong>PGr</strong></td>
-                                    <td>Nhóm mua hàng (Purchase Group)</td>
-                                    <td>**Mới thêm**. Sẽ được lưu vào chi tiết mặt hàng.</td>
-                                </tr>
+
                                 <tr>
                                     <td><strong>SLoc</strong></td>
                                     <td>Mã SLoc (Storage Location)</td>
@@ -509,7 +500,6 @@
                         <td><input type="text" name="items[${itemIndex}][item_code]" class="form-control" value="${item.item_code || ''}" required></td>
                         <td><input type="text" name="items[${itemIndex}][item_name]" class="form-control" value="${item.item_name || ''}" required></td>
                         <td><input type="text" name="items[${itemIndex}][old_item_code]" class="form-control" value="${item.old_item_code || ''}"></td>
-                        <td><input type="text" name="items[${itemIndex}][legacy_item_code]" class="form-control" value="${item.legacy_item_code || ''}"></td>
                         <td><input type="number" name="items[${itemIndex}][order_quantity]" class="form-control quantity-input" value="${item.order_quantity || 0}" required step="any" min="0.001"></td>
                         <td><input type="text" name="items[${itemIndex}][order_unit]" class="form-control" value="${item.order_unit || 'PC'}"></td>
                         <td><input type="number" name="items[${itemIndex}][inventory_quantity]" class="form-control inventory-quantity-input" value="${item.inventory_quantity || 0}" step="any" min="0"></td>
@@ -519,7 +509,6 @@
                         <td><input type="text" name="items[${itemIndex}][subtotal_display]" class="form-control subtotal-display" readonly></td>
                         <td><input type="text" name="items[${itemIndex}][using_dept_code]" class="form-control" value="${item.using_dept_code || ''}"></td>
                         <td><input type="text" name="items[${itemIndex}][plant_system]" class="form-control" value="${item.plant_system || ''}"></td>
-                        <td><input type="text" name="items[${itemIndex}][purchase_group]" class="form-control" value="${item.purchase_group || ''}"></td>
                         <td class="text-center align-middle"><button type="button" class="btn btn-danger btn-sm remove-item-btn"><i class="fas fa-trash"></i></button></td>
                     </tr>
                 `;

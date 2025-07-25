@@ -156,78 +156,95 @@ class UserController extends Controller
     }
 
     public function show(User $user)
-    {
-        $user->load([
-            'mainBranch' => function ($query) {
-                $query->whereNotNull('id');
-            },
-            'jobTitle' => function ($query) {
-                $query->whereNotNull('id');
-            },
-            'sections',
-            'assignments.branch',
-            'assignments.group',
-            'assignments.approvalRank'
-        ]);
+{
+    // Tải các quan hệ cần thiết, đảm bảo gọi đúng tên 'sections' (số nhiều)
+    $user->load([
+        'mainBranch' => function ($query) {
+            $query->whereNotNull('id');
+        },
+        'jobTitle' => function ($query) {
+            $query->whereNotNull('id');
+        },
+        'sections',
+        'assignments.branch',
+        'assignments.group',
+        'assignments.approvalRank'
+    ]);
 
-        $userAssignments = $user->assignments;
-        $userGroupIds = $userAssignments->pluck('group_id')->unique()->toArray();
-        $userMaxRankLevel = $userAssignments->pluck('approvalRank.rank_level')->max() ?? 0;
+    $userAssignments = $user->assignments;
+    $userGroupIds = $userAssignments->pluck('group_id')->unique()->toArray();
+    $userMaxRankLevel = $userAssignments->pluck('approvalRank.rank_level')->max() ?? 0;
 
-        if (empty($userGroupIds) || !$user->main_branch_id) {
-            $purchasingSuperiors = collect([]);
-            $requestingSuperiors = collect([]);
-            return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
-        }
+    // Lấy danh sách ID các phòng ban mà người dùng này thuộc về
+    $userSectionIds = $user->sections->pluck('id')->toArray();
 
-        $superiors = User::where('id', '!=', $user->id)
-            ->whereHas('assignments', function ($query) use ($userGroupIds, $userMaxRankLevel, $user) {
-                $query->whereIn('group_id', $userGroupIds)
-                    ->where('branch_id', $user->main_branch_id)
-                    ->whereHas('approvalRank', function ($subQuery) use ($userMaxRankLevel) {
-                        $subQuery->where('rank_level', '>', $userMaxRankLevel);
-                    });
-            })->with(['assignments.approvalRank', 'assignments.group'])->get();
-
-        $requestingSuperiors = collect([]);
+    // Kiểm tra các điều kiện cần thiết, bao gồm cả việc người dùng phải có phòng ban
+    if (empty($userGroupIds) || !$user->main_branch_id || empty($userSectionIds)) {
         $purchasingSuperiors = collect([]);
+        $requestingSuperiors = collect([]);
+        return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
+    }
 
-        foreach ($superiors as $superior) {
-            foreach ($superior->assignments as $assignment) {
-                if ($assignment->branch_id == $user->main_branch_id && in_array($assignment->group_id, $userGroupIds) && $assignment->approvalRank && $assignment->approvalRank->rank_level > $userMaxRankLevel) {
-                    $rankName = $assignment->approvalRank->name ?? 'Không xác định';
+    // Truy vấn tìm cấp trên
+    $superiors = User::where('id', '!=', $user->id)
+        // Dùng whereHas để tìm những người dùng có chung ít nhất một phòng ban
+        ->whereHas('sections', function ($query) use ($userSectionIds) {
+            $query->whereIn('sections.id', $userSectionIds);
+        })
+        // Giữ nguyên logic tìm cấp trên dựa trên assignment
+        ->whereHas('assignments', function ($query) use ($userGroupIds, $userMaxRankLevel, $user) {
+            $query->whereIn('group_id', $userGroupIds)
+                ->where('branch_id', $user->main_branch_id)
+                ->whereHas('approvalRank', function ($subQuery) use ($userMaxRankLevel) {
+                    $subQuery->where('rank_level', '>', $userMaxRankLevel);
+                });
+        })->with(['assignments.approvalRank', 'assignments.group'])->get();
 
-                    if ($assignment->group_id == 1) { // Phòng Đề Nghị
-                        if (!isset($requestingSuperiors[$rankName])) {
-                            $requestingSuperiors[$rankName] = collect([]);
-                        }
-                        if (!$requestingSuperiors[$rankName]->contains('id', $superior->id)) {
-                            $requestingSuperiors[$rankName]->push($superior);
-                        }
-                    } elseif ($assignment->group_id == 2) { // Phòng Mua
-                        if (!isset($purchasingSuperiors[$rankName])) {
-                            $purchasingSuperiors[$rankName] = collect([]);
-                        }
-                        if (!$purchasingSuperiors[$rankName]->contains('id', $superior->id)) {
-                            $purchasingSuperiors[$rankName]->push($superior);
-                        }
+    // Khởi tạo các collection để chứa cấp trên đã phân loại
+    $requestingSuperiors = collect([]);
+    $purchasingSuperiors = collect([]);
+
+    // Lặp qua danh sách cấp trên để phân loại vào đúng nhóm
+    foreach ($superiors as $superior) {
+        foreach ($superior->assignments as $assignment) {
+            // Điều kiện này để đảm bảo chỉ lấy đúng assignment liên quan
+            if ($assignment->branch_id == $user->main_branch_id && in_array($assignment->group_id, $userGroupIds) && $assignment->approvalRank && $assignment->approvalRank->rank_level > $userMaxRankLevel) {
+                $rankName = $assignment->approvalRank->name ?? 'Không xác định';
+
+                if ($assignment->group_id == 1) { // Phòng Đề Nghị
+                    if (!isset($requestingSuperiors[$rankName])) {
+                        $requestingSuperiors[$rankName] = collect([]);
+                    }
+                    if (!$requestingSuperiors[$rankName]->contains('id', $superior->id)) {
+                        $requestingSuperiors[$rankName]->push($superior);
+                    }
+                } elseif ($assignment->group_id == 2) { // Phòng Mua
+                    if (!isset($purchasingSuperiors[$rankName])) {
+                        $purchasingSuperiors[$rankName] = collect([]);
+                    }
+                    if (!$purchasingSuperiors[$rankName]->contains('id', $superior->id)) {
+                        $purchasingSuperiors[$rankName]->push($superior);
                     }
                 }
             }
         }
-
-        $rankOrder = ApprovalRank::orderBy('rank_level')->pluck('name')->flip();
-
-        $requestingSuperiors = $requestingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
-            return $rankOrder[$rankName] ?? 999;
-        });
-
-        $purchasingSuperiors = $purchasingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
-            return $rankOrder[$rankName] ?? 999;
-        });
-
-        return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
     }
+
+    // Lấy thứ tự các cấp bậc để sắp xếp
+    $rankOrder = \App\Models\ApprovalRank::orderBy('rank_level')->pluck('name')->flip();
+
+    // Sắp xếp danh sách cấp trên theo rank_level
+    $requestingSuperiors = $requestingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
+        return $rankOrder[$rankName] ?? 999;
+    });
+
+    $purchasingSuperiors = $purchasingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
+        return $rankOrder[$rankName] ?? 999;
+    });
+
+    // Trả về view với dữ liệu đã xử lý
+    return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
+}
     public function edit(User $user)
     {
         $user->load('sections', 'assignments.approvalRank');

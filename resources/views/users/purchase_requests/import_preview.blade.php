@@ -154,7 +154,7 @@
                                         <th>Mã hàng*</th>
                                         <th>Tên hàng*</th>
                                         <th>Mã hàng cũ</th>
-                                        <th>Mã hàng phụ</th>
+
                                         <th>SL Đặt*</th>
                                         <th>ĐV Đặt</th>
                                         <th>SL Kho</th>
@@ -164,7 +164,7 @@
                                         <th>Thành tiền</th>
                                         <th>Mã phòng SD</th>
                                         <th>Plant hệ</th>
-                                        <th>Nhóm mua hàng</th>
+
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -174,7 +174,6 @@
                                             <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][item_code]" class="form-control form-control-sm" value="{{ $item['item_code'] }}" required></td>
                                             <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][item_name]" class="form-control form-control-sm" value="{{ $item['item_name'] }}" required></td>
                                             <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][old_item_code]" class="form-control form-control-sm" value="{{ $item['old_item_code'] }}"></td>
-                                            <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][legacy_item_code]" class="form-control form-control-sm" value="{{ $item['legacy_item_code'] }}"></td>
                                             <td><input type="number" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][order_quantity]" class="form-control form-control-sm item-quantity-input" value="{{ $item['order_quantity'] }}" required step="any" min="0.001"></td>
                                             <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][order_unit]" class="form-control form-control-sm" value="{{ $item['order_unit'] }}"></td>
                                             <td><input type="number" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][inventory_quantity]" class="form-control form-control-sm item-inventory-quantity-input" value="{{ $item['inventory_quantity'] }}" step="any" min="0"></td>
@@ -184,7 +183,6 @@
                                             <td><input type="text" class="form-control form-control-sm item-subtotal-display" value="{{ number_format($item['subtotal'], 2, '.', ',') }}" readonly></td>
                                             <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][using_dept_code]" class="form-control form-control-sm" value="{{ $item['using_dept_code'] }}"></td>
                                             <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][plant_system]" class="form-control form-control-sm" value="{{ $item['plant_system'] }}"></td>
-                                            <td><input type="text" name="prs[{{ $prIndex }}][items][{{ $itemIndex }}][purchase_group]" class="form-control form-control-sm" value="{{ $item['purchase_group'] }}"></td>
                                         </tr>
                                     @endforeach
                                 </tbody>
