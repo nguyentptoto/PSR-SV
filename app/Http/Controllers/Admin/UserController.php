@@ -246,69 +246,67 @@ class UserController extends Controller
     return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
 }
     public function edit(User $user)
-    {
-        $user->load('sections', 'assignments.approvalRank');
-        $branches = Branch::all();
-        $sections = Section::all();
-        $groups = Group::all();
-        $ranks = ApprovalRank::where('rank_level', '>', 0)->get();
-        $jobTitles = JobTitle::all();
+{
+    $user->load('sections', 'assignments'); // Chỉ cần load assignment là đủ
+    $branches = Branch::all();
+    $sections = Section::all();
+    $groups = Group::all();
+    $ranks = ApprovalRank::where('rank_level', '>', 0)->get();
+    $jobTitles = JobTitle::all();
 
-        $userSections = $user->sections->pluck('id')->toArray();
-        $userAssignments = $user->assignments->keyBy(function ($item) {
-            return $item->group_id . '-' . $item->branch_id;
-        });
+    $userSections = $user->sections->pluck('id')->toArray();
 
-        return view('admin.users.edit', compact('user', 'branches', 'sections', 'groups', 'ranks', 'userSections', 'userAssignments', 'jobTitles'));
-    }
+    // ✅ DÒNG ĐÃ SỬA: Tạo mảng với key là group_id và value là approval_rank_id
+    $userAssignments = $user->assignments->pluck('approval_rank_id', 'group_id')->all();
+
+    return view('admin.users.edit', compact('user', 'branches', 'sections', 'groups', 'ranks', 'userSections', 'userAssignments', 'jobTitles'));
+}
 
     public function update(Request $request, User $user)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'employee_id' => 'required|string|max:255|unique:users,employee_id,' . $user->id,
-            'prs_id' => 'nullable|string|max:50|unique:users,prs_id,' . $user->id,
-            'password' => ['nullable', 'confirmed', Rules\Password::min(8)],
-            'job_title_id' => 'required|exists:job_titles,id',
-            'main_branch_id' => 'required|exists:branches,id',
-            'status' => 'required|boolean',
-            'signature_image' => 'nullable|image|mimes:png,jpg,jpeg|max:1024',
-            'sections' => 'required|array',
-            'sections.*' => 'exists:sections,id',
-            'assignments' => 'nullable|array',
-            'assignments.*' => 'nullable|exists:approval_ranks,id',
-        ]);
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+        'employee_id' => 'required|string|max:255|unique:users,employee_id,' . $user->id,
+        'prs_id' => 'nullable|string|max:50|unique:users,prs_id,' . $user->id,
+        'password' => ['nullable', 'confirmed', Rules\Password::min(8)],
+        'job_title_id' => 'required|exists:job_titles,id',
+        'main_branch_id' => 'required|exists:branches,id',
+        'status' => 'required|boolean',
+        'signature_image' => 'nullable|image|mimes:png,jpg,jpeg|max:1024',
+        'sections' => 'required|array',
+        'sections.*' => 'exists:sections,id',
+        'assignments' => 'nullable|array', // Giữ nguyên validation
+        'assignments.*' => 'nullable|exists:approval_ranks,id',
+    ]);
 
-        DB::beginTransaction();
-        try {
-            $updateData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id']);
+    DB::beginTransaction();
+    try {
+        $updateData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id']);
 
-            if ($request->filled('password')) {
-                $updateData['password'] = Hash::make($request->password);
+        if ($request->filled('password')) {
+            $updateData['password'] = Hash::make($request->password);
+        }
+
+        if ($request->hasFile('signature_image')) {
+            if ($user->signature_image_path) {
+                Storage::disk('public')->delete($user->signature_image_path);
             }
+            $imageFile = $request->file('signature_image');
+            $employeeId = $validated['employee_id'];
+            $extension = $imageFile->getClientOriginalExtension();
+            $newFileName = $employeeId . '.' . $extension;
+            $path = $imageFile->storeAs('signatures', $newFileName, 'public');
+            $updateData['signature_image_path'] = $path;
+        }
 
-            // ✅ SỬA ĐỔI: Lưu ảnh chữ ký với tên là mã nhân viên khi cập nhật
-            if ($request->hasFile('signature_image')) {
-                // Xóa ảnh cũ nếu có
-                if ($user->signature_image_path) {
-                    Storage::disk('public')->delete($user->signature_image_path);
-                }
+        $user->update($updateData);
+        $user->sections()->sync($validated['sections']);
 
-                $imageFile = $request->file('signature_image');
-                $employeeId = $validated['employee_id'];
-                $extension = $imageFile->getClientOriginalExtension();
-                $newFileName = $employeeId . '.' . $extension;
-
-                // Dùng storeAs để lưu với tên tùy chỉnh
-                $path = $imageFile->storeAs('signatures', $newFileName, 'public');
-                $updateData['signature_image_path'] = $path;
-            }
-
-            $user->update($updateData);
-            $user->sections()->sync($validated['sections']);
-
-            $user->assignments()->delete();
+        // ✅ BỌC TOÀN BỘ LOGIC XỬ LÝ ASSIGNMENT TRONG LỆNH IF NÀY
+        // Chỉ cập nhật assignments nếu trường này được gửi đi từ form
+        if ($request->has('assignments')) {
+            $user->assignments()->delete(); // Xóa các phân quyền cũ
 
             if (!empty($validated['assignments'])) {
                 foreach ($validated['assignments'] as $group_id => $approval_rank_id) {
@@ -321,15 +319,16 @@ class UserController extends Controller
                     }
                 }
             }
-
-            DB::commit();
-            return redirect()->route('admin.users.index')->with('success', 'Cập nhật người dùng thành công.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('Lỗi cập nhật người dùng: ' . $e->getMessage());
-            return back()->with('error', 'Đã xảy ra lỗi: ' . $e->getMessage())->withInput();
         }
+
+        DB::commit();
+        return redirect()->route('admin.users.index')->with('success', 'Cập nhật người dùng thành công.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Lỗi cập nhật người dùng: ' . $e->getMessage());
+        return back()->with('error', 'Đã xảy ra lỗi: ' . $e->getMessage())->withInput();
     }
+}
     public function destroy(User $user)
     {
         DB::beginTransaction();

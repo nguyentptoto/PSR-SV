@@ -57,7 +57,7 @@ class PurchaseRequestController extends Controller
             'requires_director_approval' => 'nullable|boolean',
             'priority' => 'nullable|string|in:urgent,normal,quotation_only',
             'remarks' => 'nullable|string|max:2000',
-            'attachment_file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,png,zip|max:10240',
+            'attachment_file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx|max:10240',
             'sap_request_date' => 'nullable|date',
             'po_number' => 'nullable|string|max:255',
             'po_date' => 'nullable|date',
@@ -75,8 +75,7 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
-            'items.*.purchase_group' => 'nullable|string|max:20',
-            'items.*.legacy_item_code' => 'nullable|string|max:255',
+
         ]);
 
         DB::beginTransaction();
@@ -130,8 +129,7 @@ class PurchaseRequestController extends Controller
                     'subtotal' => $itemData['order_quantity'] * $itemData['estimated_price'],
                     'using_dept_code' => $itemData['using_dept_code'] ?? null,
                     'plant_system' => $itemData['plant_system'] ?? null,
-                    'purchase_group' => $itemData['purchase_group'] ?? null,
-                    'legacy_item_code' => $itemData['legacy_item_code'] ?? null,
+
                 ]);
             }
 
@@ -195,7 +193,7 @@ class PurchaseRequestController extends Controller
             'priority' => 'nullable|string|in:urgent,normal,quotation_only',
             'remarks' => 'nullable|string|max:2000',
             'requires_director_approval' => 'nullable|boolean',
-            'attachment_file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,png,zip|max:10240',
+            'attachment_file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx|max:10240',
             'sap_request_date' => 'nullable|date',
             'po_number' => 'nullable|string|max:255',
             'po_date' => 'nullable|date',
@@ -213,8 +211,7 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
-            'items.*.purchase_group' => 'nullable|string|max:20',
-            'items.*.legacy_item_code' => 'nullable|string|max:255',
+
         ]);
 
         DB::beginTransaction();
@@ -256,8 +253,7 @@ class PurchaseRequestController extends Controller
                     'subtotal' => $itemData['order_quantity'] * $itemData['estimated_price'],
                     'using_dept_code' => $itemData['using_dept_code'] ?? null,
                     'plant_system' => $itemData['plant_system'] ?? null,
-                    'purchase_group' => $itemData['purchase_group'] ?? null,
-                    'legacy_item_code' => $itemData['legacy_item_code'] ?? null,
+
                 ]);
             }
 
@@ -352,17 +348,12 @@ class PurchaseRequestController extends Controller
             Log::info('Excel File MimeType:', [$request->file('excel_file')->getMimeType()]);
             Log::info('Excel File Size (bytes):', [$request->file('excel_file')->getSize()]);
         }
-        if ($request->hasFile('attachment_zip_file')) {
-            Log::info('ZIP File Name:', [$request->file('attachment_zip_file')->getClientOriginalName()]);
-            Log::info('ZIP File MimeType:', [$request->file('attachment_zip_file')->getMimeType()]);
-            Log::info('ZIP File Size (bytes):', [$request->file('attachment_zip_file')->getSize()]);
-        }
+
         Log::info('--- Kết thúc Debug ImportPreview Request ---');
 
 
         $request->validate([
             'excel_file' => 'required|file|mimes:xls,xlsx|max:10240',
-            'attachment_zip_file' => 'nullable|file|mimes:zip|max:51200', // Validate file ZIP (e.g., 50MB)
         ]);
 
         $import = new PurchaseRequestsImport();
@@ -387,81 +378,14 @@ class PurchaseRequestController extends Controller
                 return response()->json(['success' => false, 'message' => 'Không tìm thấy dữ liệu phiếu hợp lệ nào trong file Excel.', 'errors' => $errors], 400);
             }
 
-            // Bước 2: Xử lý file ZIP nếu có
-            $attachmentMap = []; // Map PIA_CODE => temporary_file_path
-            $tempDirForAttachments = null; // Đường dẫn đến thư mục tạm giải nén
 
-            Log::info('Checking for attachment_zip_file presence...'); // Debug: Kiểm tra sự hiện diện của ZIP
-
-            if ($request->hasFile('attachment_zip_file')) {
-                Log::info('attachment_zip_file is present. Starting ZIP processing.'); // Debug: ZIP có mặt, bắt đầu xử lý
-                $zipFile = $request->file('attachment_zip_file');
-                $tempDirForAttachments = 'pr_temp_attachments/' . Str::uuid()->toString();
-                Storage::disk('local')->makeDirectory($tempDirForAttachments); // Tạo thư mục tạm
-
-                Log::info('Attempting to open ZIP file: ' . $zipFile->getRealPath());
-
-                $zip = new ZipArchive;
-                if ($zip->open($zipFile->getRealPath()) === TRUE) {
-                    $zip->extractTo(Storage::disk('local')->path($tempDirForAttachments));
-                    $zip->close();
-                    Log::info('ZIP extracted to: ' . $tempDirForAttachments);
-
-                    // Đọc tất cả các file trong thư mục tạm và tạo map PIA_CODE -> path
-                    // Sử dụng allFiles() để duyệt qua các file trong thư mục con nếu có
-                    $extractedFiles = Storage::disk('local')->allFiles($tempDirForAttachments);
-                    Log::info('Extracted files list from temp dir: ', $extractedFiles);
-
-                    foreach ($extractedFiles as $filePath) {
-                        $fileNameWithoutExtension = pathinfo($filePath, PATHINFO_FILENAME);
-                        $fileExtension = pathinfo($filePath, PATHINFO_EXTENSION);
-
-                        // Đảm bảo không có khoảng trắng ở đầu/cuối tên file trước khi dùng regex
-                        $cleanedFileName = trim($fileNameWithoutExtension);
-                        Log::info("Processing extracted file: Filename: '{$cleanedFileName}'. Full path: {$filePath}"); // Debug: Xử lý file trích xuất
-
-                        // Cố gắng trích xuất PIA_CODE từ tên file
-                        // Regex: Bắt đầu chuỗi, tùy chọn PR_, sau đó 10+ chữ số (nhóm 1), tùy chọn gạch ngang/gạch dưới theo sau bất kỳ ký tự nào, kết thúc chuỗi.
-                        if (preg_match('/^(?:PR_)?(\d{10,})(?:[-_].*)?$/i', $cleanedFileName, $matches)) {
-                            $piaCodeFromFile = $matches[1]; // Lấy phần số là PIA_CODE
-                            // Kiểm tra trùng lặp: nếu có nhiều file cho cùng một PR_NO, chỉ lấy file đầu tiên hoặc theo quy tắc ưu tiên
-                            if (!isset($attachmentMap[$piaCodeFromFile])) {
-                                $attachmentMap[$piaCodeFromFile] = $filePath; // Lưu đường dẫn tạm
-                                Log::info("Matched file in ZIP: '{$cleanedFileName}' -> Extracted PIA Code: '{$piaCodeFromFile}'. Mapped Path: {$filePath}");
-                            } else {
-                                Log::warning("Đã tìm thấy nhiều file cho PR_NO {$piaCodeFromFile} trong ZIP. Chỉ lấy file đầu tiên: " . $attachmentMap[$piaCodeFromFile]);
-                            }
-                        } else {
-                            Log::warning("File trong ZIP không khớp định dạng PR_NO: Filename: '{$cleanedFileName}'. Path: {$filePath}. Regex did not match.");
-                        }
-                    }
-                    Log::info('Final attachment map created:', $attachmentMap);
-
-                } else {
-                    $zipError = $zip->status ? $zip->getStatusString() : 'Không xác định';
-                    Log::error("Không thể mở file ZIP hoặc giải nén lỗi. Lỗi ZIP: {$zipError}. Path: " . $zipFile->getRealPath());
-                    throw new \Exception('Không thể mở file ZIP hoặc giải nén lỗi: ' . $zipError);
-                }
-            } else {
-                Log::info('attachment_zip_file is NOT present. Skipping ZIP processing.'); // Debug: ZIP không có mặt
-            }
-
-
-            // Bước 3: Gán đường dẫn file đính kèm tạm vào dữ liệu phiếu
-            foreach ($importedData as &$prData) { // Dùng & để thay đổi trực tiếp mảng gốc
-                // Đảm bảo pia_code từ Excel cũng được trim() để khớp với piaCodeFromFile đã trim() trong regex
-                $excelPiaCode = trim($prData['pia_code']);
-                $prData['temporary_attachment_path'] = $attachmentMap[$excelPiaCode] ?? null;
-                Log::info("Mapping attachment for PR: '{$excelPiaCode}'. Found in map: " . ($prData['temporary_attachment_path'] ? 'Yes' : 'No') . ". Mapped path: " . ($prData['temporary_attachment_path'] ?? 'N/A'));
-            }
-            unset($prData); // Xóa tham chiếu sau vòng lặp
 
             // Bước 4: Lưu dữ liệu đã import (bao gồm đường dẫn file tạm) vào session
             $sessionId = Str::uuid()->toString();
             // Lưu cả đường dẫn thư mục tạm cho việc cleanup sau này
             $sessionData = [
                 'purchase_requests' => $importedData,
-                'temp_attachments_dir' => $tempDirForAttachments // Lưu đường dẫn thư mục tạm
+                 'temp_attachments_dir' => null // Set to null as no ZIP is processed
             ];
             $request->session()->put('imported_purchase_requests_' . $sessionId, $sessionData);
 
@@ -485,10 +409,7 @@ class PurchaseRequestController extends Controller
             }
             return response()->json(['success' => false, 'message' => 'Lỗi validation khi đọc file Excel.', 'errors' => $errors], 422);
         } catch (\Exception $e) {
-            // Đảm bảo thư mục tạm được xóa nếu có lỗi trước khi lưu vào session
-            if ($tempDirForAttachments && Storage::disk('local')->exists($tempDirForAttachments)) {
-                Storage::disk('local')->deleteDirectory($tempDirForAttachments);
-            }
+
             Log::error("Error importing purchase requests excel file for preview: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['success' => false, 'message' => 'Đã xảy ra lỗi khi đọc file Excel: ' . $e->getMessage(), 'errors' => []], 500);
         }
@@ -504,7 +425,8 @@ class PurchaseRequestController extends Controller
         }
 
         $importedPurchaseRequests = $sessionData['purchase_requests'];
-        $tempAttachmentsDir = $sessionData['temp_attachments_dir']; // Lấy đường dẫn thư mục tạm
+        $tempAttachmentsDir = $sessionData['temp_attachments_dir']; // This will be null now
+
 
         $executingDepartments = ExecutingDepartment::orderBy('name')->get();
         $user = Auth::user();
@@ -516,15 +438,20 @@ class PurchaseRequestController extends Controller
 
      public function createFromImport(Request $request)
     {
+        Log::info('--- Bắt đầu Debug createFromImport Request ---');
+        Log::info('Timestamp start: ' . microtime(true));
+
         $sessionId = $request->input('session_id');
         $sessionData = $request->session()->get('imported_purchase_requests_' . $sessionId);
 
         if (!$sessionId || !$sessionData) {
+            Log::error('DEBUG: Session data not found or expired in createFromImport. Timestamp: ' . microtime(true));
             return response()->json(['success' => false, 'message' => 'Phiên làm việc đã hết hạn hoặc dữ liệu không tồn tại. Vui lòng import lại.'], 400);
         }
 
         $importedPurchaseRequests = $sessionData['purchase_requests'];
-        $tempAttachmentsDir = $sessionData['temp_attachments_dir'];
+        $tempAttachmentsDir = $sessionData['temp_attachments_dir']; // This will be null now
+        Log::info('DEBUG: Session data retrieved. Number of PRs: ' . count($importedPurchaseRequests) . '. Temp dir: ' . ($tempAttachmentsDir ?? 'N/A') . '. Timestamp: ' . microtime(true));
 
         $createdCount = 0;
         $failedCount = 0;
@@ -535,45 +462,115 @@ class PurchaseRequestController extends Controller
         $branch = $requester->mainBranch;
         $section = $requester->sections->first();
 
-        // Lấy lại các PIA codes từ DB một lần nữa để tránh race condition
         $existingPiaCodes = PurchaseRequest::whereIn('pia_code', collect($importedPurchaseRequests)->pluck('pia_code')->toArray())
             ->pluck('pia_code')
             ->toArray();
+        Log::info('DEBUG: Existing PIA codes checked. Timestamp: ' . microtime(true));
 
-        foreach ($importedPurchaseRequests as $prData) {
-            if (in_array($prData['pia_code'], $existingPiaCodes) || PurchaseRequest::where('pia_code', $prData['pia_code'])->exists()) {
-                $errors[] = "Mã phiếu PR_NO '{$prData['pia_code']}' đã tồn tại trong hệ thống. Bỏ qua tạo phiếu này.";
+        // Lấy các file đính kèm riêng lẻ được upload từ form preview
+        // $request->file('prs') sẽ là một mảng các UploadedFile object, được index theo prIndex
+        $uploadedAttachments = $request->file('prs');
+        Log::info('DEBUG: Uploaded individual attachments from form:', $uploadedAttachments ?? []);
+
+        foreach ($importedPurchaseRequests as $prIndex => $prData) { // prData là từ session
+            // Lấy prFormData tương ứng từ request (đã có các chỉnh sửa của người dùng)
+            // prFormData chứa các input text, select và input file (nếu có)
+            $prFormData = $request->input("prs.{$prIndex}");
+
+            // temporary_attachment_path từ session không còn được dùng nữa
+            // $temporaryAttachmentPathFromSession = $prData['temporary_attachment_path'] ?? null; // Removed this line
+
+            // Lấy file được upload thủ công cho PR này (nếu có)
+            $individualUploadedFile = null;
+            // Kiểm tra xem $uploadedAttachments[$prIndex] có tồn tại và là một UploadedFile object không
+            // Hoặc nếu nó là một mảng (khi input name là prs[index][attachment_file]), kiểm tra phần tử 'attachment_file'
+            if (isset($uploadedAttachments[$prIndex]) && $uploadedAttachments[$prIndex] instanceof \Illuminate\Http\UploadedFile) {
+                $individualUploadedFile = $uploadedAttachments[$prIndex];
+            } else if (isset($uploadedAttachments[$prIndex]['attachment_file']) && $uploadedAttachments[$prIndex]['attachment_file'] instanceof \Illuminate\Http\UploadedFile) {
+                 $individualUploadedFile = $uploadedAttachments[$prIndex]['attachment_file'];
+            }
+
+            // Validate file upload thủ công
+            if ($individualUploadedFile && !$individualUploadedFile->isValid()) {
+                $errors[] = "File đính kèm cho phiếu '{$prData['pia_code']}' không hợp lệ hoặc bị lỗi upload.";
+                Log::error("ERROR: Invalid file upload for PR '{$prData['pia_code']}'.");
                 $failedCount++;
+                continue; // Bỏ qua phiếu này nếu file không hợp lệ
+            }
+            // Thêm validation mime types và max size cho file upload thủ công
+            // (Đây là validation runtime, nên cũng cần validation ở trên đầu hàm createFromImport)
+            if ($individualUploadedFile) {
+                $allowedMimes = ['pdf', 'doc', 'docx', 'xls', 'xlsx'];
+                $fileExtension = $individualUploadedFile->getClientOriginalExtension();
+                if (!in_array($fileExtension, $allowedMimes)) {
+                    $errors[] = "File đính kèm cho phiếu '{$prData['pia_code']}' có định dạng không hợp lệ ({$fileExtension}). Chỉ chấp nhận PDF, Word, Excel.";
+                    $failedCount++;
+                    Log::error("ERROR: Invalid file extension for PR '{$prData['pia_code']}': {$fileExtension}.");
+                    continue;
+                }
+                $maxSize = 10240; // 10MB
+                if ($individualUploadedFile->getSize() / 1024 > $maxSize) {
+                    $errors[] = "File đính kèm cho phiếu '{$prData['pia_code']}' quá lớn (tối đa {$maxSize}KB).";
+                    $failedCount++;
+                    Log::error("ERROR: File size exceeded for PR '{$prData['pia_code']}'. Size: {$individualUploadedFile->getSize()}");
+                    continue;
+                }
+            }
+
+
+            // Xóa các trường tạm thời không thuộc DB khỏi prData trước khi tạo PurchaseRequest
+            unset($prData['items']);
+            unset($prData['temporary_attachment_path']); // Đảm bảo xóa nếu nó vẫn còn từ session cũ
+
+            // Hợp nhất dữ liệu: ưu tiên dữ liệu từ form, sau đó là từ session
+            $finalPrData = array_merge($prData, $prFormData);
+
+            // Lấy items từ form data (đây là items đã được người dùng chỉnh sửa)
+            $itemsData = $prFormData['items'] ?? [];
+
+            Log::info('DEBUG: Processing PR: ' . $finalPrData['pia_code'] . '. Timestamp: ' . microtime(true));
+
+            if (in_array($finalPrData['pia_code'], $existingPiaCodes) || PurchaseRequest::where('pia_code', $finalPrData['pia_code'])->exists()) {
+                $errors[] = "Mã phiếu PR_NO '{$finalPrData['pia_code']}' đã tồn tại trong hệ thống. Bỏ qua tạo phiếu này.";
+                $failedCount++;
+                Log::warning('DEBUG: PR already exists: ' . $finalPrData['pia_code']);
                 continue;
             }
 
-            $prData['requester_id'] = $requester->id;
-            $prData['branch_id'] = $branch->id;
-            $prData['section_id'] = $section->id;
-
-            $itemsData = $prData['items'];
-            $temporaryAttachmentPath = $prData['temporary_attachment_path'] ?? null; // Lấy đường dẫn tạm của file đính kèm
-
-            unset($prData['items']);
-            unset($prData['temporary_attachment_path']); // Xóa khỏi prData trước khi tạo PurchaseRequest
+            $finalPrData['requester_id'] = $requester->id;
+            $finalPrData['branch_id'] = $branch->id;
+            $finalPrData['section_id'] = $section->id;
+            $finalPrData['requires_director_approval'] = (bool)($finalPrData['requires_director_approval'] ?? false);
 
             DB::beginTransaction();
             try {
-                $purchaseRequest = PurchaseRequest::create($prData);
+                Log::info('DEBUG: Before PR create. Timestamp: ' . microtime(true));
+                $purchaseRequest = PurchaseRequest::create($finalPrData);
+                Log::info('DEBUG: PR created (' . $purchaseRequest->id . '). Before items create. Timestamp: ' . microtime(true));
                 $purchaseRequest->items()->createMany($itemsData);
+                Log::info('DEBUG: Items created for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
 
-                // Di chuyển file đính kèm tạm sang thư mục vĩnh viễn
-                if ($temporaryAttachmentPath && Storage::disk('local')->exists($temporaryAttachmentPath)) {
-                    $fileName = pathinfo($temporaryAttachmentPath, PATHINFO_BASENAME);
-                    $newAttachmentPath = 'pr_attachments/' . $purchaseRequest->pia_code . '_' . time() . '.' . pathinfo($fileName, PATHINFO_EXTENSION);
-
-                    // Copy từ local disk (temp) sang public disk (permanent)
-                    Storage::disk('public')->put($newAttachmentPath, Storage::disk('local')->get($temporaryAttachmentPath));
-
-                    // Cập nhật đường dẫn file đính kèm vào phiếu PR
-                    $purchaseRequest->update(['attachment_path' => $newAttachmentPath]);
+                $finalAttachmentPath = null;
+                // Xử lý file được upload thủ công
+                if ($individualUploadedFile && $individualUploadedFile->isValid()) {
+                    Log::info('DEBUG: Individual attachment uploaded. Storing new file for PR: ' . $purchaseRequest->pia_code . '. Timestamp: ' . microtime(true));
+                    $fileName = $individualUploadedFile->getClientOriginalName();
+                    $extension = $individualUploadedFile->getClientOriginalExtension();
+                    $newFileName = $purchaseRequest->pia_code . '_' . time() . '.' . $extension; // Đổi tên file
+                    $finalAttachmentPath = $individualUploadedFile->storeAs('pr_attachments', $newFileName, 'public');
+                    Log::info('DEBUG: Individual file stored at: ' . $finalAttachmentPath . '. Timestamp: ' . microtime(true));
+                }
+                else {
+                    Log::info('DEBUG: No attachment found or uploaded for PR: ' . $purchaseRequest->pia_code);
                 }
 
+                // Cập nhật đường dẫn file đính kèm cuối cùng vào phiếu PR
+                if ($finalAttachmentPath) {
+                    $purchaseRequest->update(['attachment_path' => $finalAttachmentPath]);
+                    Log::info('DEBUG: PR attachment path updated for ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+                }
+
+                Log::info('DEBUG: Before ApprovalHistory create. Timestamp: ' . microtime(true));
                 ApprovalHistory::create([
                     'purchase_request_id' => $purchaseRequest->id,
                     'user_id' => Auth::id(),
@@ -582,33 +579,46 @@ class PurchaseRequestController extends Controller
                     'signature_image_path' => Auth::user()->signature_image_path ?? 'no-signature.png',
                     'comment' => 'Tạo phiếu đề nghị mới từ import Excel.',
                 ]);
-                DB::commit();
-                $createdCount++;
-                $successfulPiaCodes[] = $prData['pia_code'];
+                Log::info('DEBUG: ApprovalHistory created. Timestamp: ' . microtime(true));
 
+                DB::commit();
+                Log::info('DEBUG: DB commit successful for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+                $createdCount++;
+                $successfulPiaCodes[] = $finalPrData['pia_code'];
+
+                Log::info('DEBUG: Before sending notification for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
                 $nextApprovers = $this->findNextApprovers($purchaseRequest);
                 if ($nextApprovers->isNotEmpty()) {
                     SendApprovalNotification::dispatch($purchaseRequest, $nextApprovers);
+                    Log::info('DEBUG: Notification dispatched for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+                } else {
+                    Log::info('DEBUG: No next approvers found for PR: ' . $purchaseRequest->id . '. No notification dispatched.');
                 }
 
             } catch (\Exception $e) {
                 DB::rollBack();
-                $errors[] = "Lỗi khi lưu phiếu '{$prData['pia_code']}': " . $e->getMessage();
-                Log::error("Lỗi khi tạo phiếu từ import '{$prData['pia_code']}': " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+                $errors[] = "Lỗi khi lưu phiếu '{$finalPrData['pia_code']}': " . $e->getMessage();
+                Log::error("ERROR: Failed to create PR '{$finalPrData['pia_code']}'. Error: " . $e->getMessage(), ['trace' => $e->getTraceAsString(), 'timestamp_error' => microtime(true)]);
                 $failedCount++;
             }
         }
 
-        // Bước cuối: Xóa thư mục tạm chứa file đính kèm (nếu tồn tại) và session data
-        if ($tempAttachmentsDir && Storage::disk('local')->exists($tempAttachmentsDir)) {
-            Storage::disk('local')->deleteDirectory($tempAttachmentsDir);
-        }
+        Log::info('DEBUG: All PRs processed. Starting cleanup. Timestamp: ' . microtime(true));
+        // Không còn thư mục tạm từ ZIP để xóa
+        // if ($originalTempAttachmentsDir && Storage::disk('local')->exists($originalTempAttachmentsDir)) {
+        //     Storage::disk('local')->deleteDirectory($originalTempAttachmentsDir);
+        //     Log::info('DEBUG: Temporary attachment directory cleaned up. Timestamp: ' . microtime(true));
+        // } else {
+        //     Log::info('DEBUG: No temporary attachment directory to clean up or path is null.');
+        // }
         $request->session()->forget('imported_purchase_requests_' . $sessionId);
+        Log::info('DEBUG: Session data forgotten. Timestamp: ' . microtime(true));
 
         $message = "Đã tạo thành công {$createdCount} phiếu đề nghị.";
         if ($failedCount > 0) {
             $message .= " Thất bại {$failedCount} phiếu.";
         }
+        Log::info('DEBUG: createFromImport finished. Total created: ' . $createdCount . ', failed: ' . $failedCount . '. Timestamp: ' . microtime(true));
 
         return response()->json([
             'success' => ($createdCount > 0 && $failedCount == 0),

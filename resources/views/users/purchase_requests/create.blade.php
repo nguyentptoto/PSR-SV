@@ -47,51 +47,49 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-3 form-group">
-                        <label for="pia_code">Mã Phiếu (PR NO)*</label>
-                        <input type="text" name="pia_code" class="form-control" value="{{ old('pia_code') }}" required>
-                    </div>
-                    <div class="col-md-3 form-group">
-                        <label for="section_id">Phòng ban của bạn*</label>
-                        <select name="section_id" class="form-control" required>
-                            @foreach ($user->sections as $section)
-                                <option value="{{ $section->id }}"
-                                    {{ old('section_id', $user->sections->first()->id) == $section->id ? 'selected' : '' }}>
-                                    {{ $section->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3 form-group">
-                        <label for="executing_department_id">Phòng ban yêu cầu*</label>
-                        <select name="executing_department_id" id="executing-department-select" class="form-control"
-                            required style="width: 100%;">
-                            <option value="">-- Chọn phòng ban --</option>
-                            @foreach ($executingDepartments as $department)
-                                <option value="{{ $department->id }}" data-code="{{ $department->code }}"
-                                    {{ old('executing_department_id') == $department->id ? 'selected' : '' }}>
-                                    {{ $department->name }} ({{ $department->code }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3 form-group">
-                        <label>Nhà máy (Plant)*</label>
-                        <input type="text" class="form-control" value="{{ $user->mainBranch->name }}" disabled>
-                        <input type="hidden" name="branch_id" value="{{ $user->mainBranch->id }}">
-                    </div>
+                <div class="col-md-3 form-group">
+                    <label for="pia_code">Mã Phiếu (PR NO)*</label>
+                    <input type="text" name="pia_code" class="form-control" value="{{ old('pia_code') }}" required>
                 </div>
+                <div class="col-md-3 form-group">
+                    <label for="section_id">Phòng ban của bạn*</label>
+                    <select name="section_id" class="form-control" required>
+                        @foreach ($user->sections as $section)
+                            <option value="{{ $section->id }}" {{ old('section_id', $user->sections->first()->id) == $section->id ? 'selected' : '' }}>
+                                {{ $section->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 form-group">
+                    <label for="executing_department_id">Phòng ban yêu cầu*</label>
+                    <select name="executing_department_id" id="executing-department-select" class="form-control" required style="width: 100%;">
+                        <option value="">-- Chọn phòng ban --</option>
+                        @foreach ($executingDepartments as $department)
+                            <option value="{{ $department->id }}" data-code="{{ $department->code }}" {{ old('executing_department_id') == $department->id ? 'selected' : '' }}>
+                                {{ $department->name }} ({{ $department->code }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 form-group">
+                    <label>Nhà máy (Plant)*</label>
+                    <input type="text" class="form-control" value="{{ $user->mainBranch->name }}" disabled>
+                    <input type="hidden" name="branch_id" value="{{ $user->mainBranch->id }}">
+                </div>
+            </div>
                 <div class="row">
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="sap_release_date">Ngày phát hành (SAP)</label>
                         <input type="date" id="sap_release_date" name="sap_release_date" class="form-control"
                             value="{{ old('sap_release_date') }}">
                     </div>
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="requested_delivery_date">Ngày yêu cầu giao hàng*</label>
                         <input type="date" name="requested_delivery_date" class="form-control"
                             value="{{ old('requested_delivery_date') }}" required>
                     </div>
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="priority">Mức độ ưu tiên</label>
                         <select name="priority" class="form-control">
                             <option value="">-- Chọn mức độ --</option>
@@ -103,7 +101,7 @@
                                 Quotation only/Báo giá</option>
                         </select>
                     </div>
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="currency">Tiền tệ*</label>
                         <select name="currency" class="form-control" required>
                             <option value="VND" {{ old('currency', 'VND') == 'VND' ? 'selected' : '' }}>VND</option>
@@ -116,10 +114,11 @@
                     <textarea name="remarks" id="remarks" class="form-control" rows="3">{{ old('remarks') }}</textarea>
                 </div>
 
-                <div class="form-group mt-2">
-                    <label for="attachment_file">File đính kèm (Phiếu đơn lẻ)</label>
+               <div class="form-group mt-2">
+                    <label for="attachment_file">File đính kèm(Chỉ được upload PDF, EXCEL, WORD)</label>
+                    {{-- Cập nhật accept attribute --}}
                     <input type="file" name="attachment_file" id="attachment_file" class="form-control"
-                        accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,application/zip">
+                        accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
                 </div>
                 <div class="form-check mt-2">
                     <input class="form-check-input" type="checkbox" value="1" id="requires_director_approval"
@@ -131,20 +130,20 @@
 
                 {{-- Các trường mới thêm vào PurchaseRequest từ Excel (nếu bạn muốn nhập thủ công) --}}
                 <div class="row mt-3">
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="sap_request_date">Ngày yêu cầu (SAP Req.Date)</label>
                         <input type="date" name="sap_request_date" class="form-control"
                             value="{{ old('sap_request_date') }}">
                     </div>
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="po_number">Số PO (PO Number)</label>
                         <input type="text" name="po_number" class="form-control" value="{{ old('po_number') }}">
                     </div>
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="po_date">Ngày PO (PO Date)</label>
                         <input type="date" name="po_date" class="form-control" value="{{ old('po_date') }}">
                     </div>
-                    <div class="col-md-4 form-group">
+                    <div class="col-md-3 form-group">
                         <label for="sap_created_by">Người tạo (SAP Created By)</label>
                         <input type="text" name="sap_created_by" class="form-control"
                             value="{{ old('sap_created_by') }}">
@@ -240,14 +239,6 @@
                     <label for="excel_file" class="form-label">Chọn file Excel để Import</label>
                     <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx, .xls"
                         required>
-                </div>
-                <div class="form-group mb-3">
-                    <label for="attachment_zip_file" class="form-label">File đính kèm (ZIP - Tùy chọn)</label>
-                    <p class="text-muted small">Nếu có, file ZIP này phải chứa các file con được đặt tên theo Mã PR (ví dụ:
-                        <code>101532462.pdf</code> hoặc <code>1101532462.jpg</code>). Hệ thống sẽ cố gắng khớp
-                        và đính kèm.</p>
-                    <input type="file" name="attachment_zip_file" id="attachment_zip_file" class="form-control"
-                        accept="application/zip">
                 </div>
                 <button type="submit" class="btn btn-success mt-3" id="submit-import-excel-btn"><i
                         class="fas fa-upload"></i> Đọc File Excel để Xem Trước</button>

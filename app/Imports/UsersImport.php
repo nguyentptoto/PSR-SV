@@ -79,7 +79,7 @@ class UsersImport implements ToCollection, WithHeadingRow
 
                 // Chuẩn bị dữ liệu để cập nhật hoặc tạo mới
                 $userData = [
-                    'name' => trim($row['last_name'] ?? '') . ' ' . trim($row['frist_name'] ?? ''),
+                    'name' => trim($row['full_name'] ?? ''),
                     'email' => trim($row['e_mail_address']),
                     'prs_id' => $prsId,
                     'job_title_id' => $jobTitleId,
@@ -94,11 +94,11 @@ class UsersImport implements ToCollection, WithHeadingRow
 
                 // Tìm kiếm và cập nhật/tạo mới user
                 $user = User::where('employee_id', $employeeId)
-                            ->orWhere(function($query) use ($prsId) {
-                                if (!empty($prsId)) {
-                                    $query->where('prs_id', $prsId);
-                                }
-                            })->first();
+                    ->orWhere(function ($query) use ($prsId) {
+                        if (!empty($prsId)) {
+                            $query->where('prs_id', $prsId);
+                        }
+                    })->first();
 
                 if ($user) {
                     // Nếu tìm thấy user, cập nhật thông tin
@@ -121,19 +121,19 @@ class UsersImport implements ToCollection, WithHeadingRow
                 // Gán quyền hạn (assignments)
                 $user->assignments()->delete(); // Xóa các assignment cũ trước khi gán mới
                 if (!empty($row['phan_cap']) && !empty($row['group'])) {
-                     $assignmentGroupId = $groups[trim($row['group'])] ?? null;
-                     $assignmentRankId = $ranks[$row['phan_cap']] ?? null;
-                     if($assignmentGroupId && $assignmentRankId) {
-                         $allBranches = Branch::all();
-                         foreach($allBranches as $branch) {
-                             Assignment::create([
-                                 'user_id' => $user->id,
-                                 'branch_id' => $branch->id,
-                                 'approval_rank_id' => $assignmentRankId,
-                                 'group_id' => $assignmentGroupId,
-                             ]);
-                         }
-                     }
+                    $assignmentGroupId = $groups[trim($row['group'])] ?? null;
+                    $assignmentRankId = $ranks[$row['phan_cap']] ?? null;
+                    if ($assignmentGroupId && $assignmentRankId) {
+                        $allBranches = Branch::all();
+                        foreach ($allBranches as $branch) {
+                            Assignment::create([
+                                'user_id' => $user->id,
+                                'branch_id' => $branch->id,
+                                'approval_rank_id' => $assignmentRankId,
+                                'group_id' => $assignmentGroupId,
+                            ]);
+                        }
+                    }
                 }
             });
         }
