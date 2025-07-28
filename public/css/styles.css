@@ -257,6 +257,43 @@ ul.dropdown-menu.dropdown-menu-lg.dropdown-menu-end.show {
 
 
 /* --- CSS CHO GIAO DIỆN MẶC ĐỊNH --- */
+
+.theme-control-button {
+    position: fixed;
+    bottom: 20px;
+    z-index: 10000;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#theme-toggle {
+    right: 20px;
+}
+
+#night-mode-toggle {
+    right: 80px;
+}
+
+#fishing-toggle {
+    right: 140px;
+}
+
+#fish-basket {
+    left: 20px;
+    width: auto;
+    padding: 0 15px;
+    font-size: 20px;
+}
+
 #theme-toggle {
     background-color: #0d6efd;
     color: white;
@@ -265,16 +302,18 @@ ul.dropdown-menu.dropdown-menu-lg.dropdown-menu-end.show {
 #fish-canvas,
 .cursor-dot,
 .cursor-outline,
-#night-mode-toggle {
+#night-mode-toggle,
+#fishing-toggle,
+#fish-basket {
     display: none;
 }
 
-/* --- CSS CHỈ ÁP DỤNG KHI GIAO DIỆN ĐỘNG ĐƯỢC KÍCH HOẠT --- */
-html.theme-animated #night-mode-toggle {
+html.theme-animated #night-mode-toggle,
+html.theme-animated #fishing-toggle,
+html.theme-animated #fish-basket {
     display: flex;
 }
 
-/* Ban ngày */
 html.theme-animated:not(.theme-night) body.login-page {
     background-image: linear-gradient(-45deg, #4facfe, #00f2fe, #48c6ef, #69cfee) !important;
 }
@@ -289,6 +328,16 @@ html.theme-animated:not(.theme-night) #night-mode-toggle {
     color: #f0f0f0;
 }
 
+html.theme-animated:not(.theme-night) #fishing-toggle {
+    background-color: #28a745;
+    color: white;
+}
+
+html.theme-animated:not(.theme-night) #fish-basket {
+    background-color: #ffc107;
+    color: #212529;
+}
+
 html.theme-animated:not(.theme-night) .cursor-dot {
     background-color: #8B4513;
 }
@@ -301,7 +350,6 @@ html.theme-animated:not(.theme-night) .cursor-outline.hover {
     background-color: rgba(210, 180, 140, 0.3);
 }
 
-/* Ban đêm */
 html.theme-animated.theme-night body.login-page {
     background-image: linear-gradient(-45deg, #03045e, #023e8a, #0077b6, #001233) !important;
 }
@@ -314,6 +362,16 @@ html.theme-animated.theme-night #theme-toggle {
 html.theme-animated.theme-night #night-mode-toggle {
     background-color: #f0f0f0;
     color: #03045e;
+}
+
+html.theme-animated.theme-night #fishing-toggle {
+    background-color: #f0f0f0;
+    color: #28a745;
+}
+
+html.theme-animated.theme-night #fish-basket {
+    background-color: #f0f0f0;
+    color: #212529;
 }
 
 html.theme-animated.theme-night .cursor-dot {

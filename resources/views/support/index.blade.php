@@ -61,7 +61,7 @@
                      <div class="mt-5">
                         {{-- ✅ Đã cập nhật icon --}}
                         <h4><i class="bi bi-book-half me-2"></i>Hướng dẫn và tài liệu</h4>
-                        <p>Bạn cũng có thể tìm thấy các câu trả lời cho những câu hỏi thường gặp trong phần <a href="{{ asset('documents/PR-1101532489.pdf') }}" download>Tài liệu hướng dẫn</a> của chúng tôi.</p>
+                        <p>Bạn cũng có thể tìm thấy các câu trả lời cho những câu hỏi thường gặp trong phần <a href="{{ asset('documents/PHẦN MỀM QUẢN LÝ PHIẾU ĐỀ NGHỊ MUA HÀNG (PRS).pdf') }}" download>Tài liệu hướng dẫn</a> của chúng tôi.</p>
                     </div>
                 </div>
                 <div class="card-footer">

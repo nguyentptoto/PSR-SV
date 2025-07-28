@@ -6,12 +6,17 @@
     <canvas id="fish-canvas"></canvas>
     <div class="cursor-dot"></div>
     <div class="cursor-outline"></div>
-      <button id="theme-toggle" class="theme-control-button" title="Đổi giao diện">
+    <button id="theme-toggle" class="theme-control-button" title="Đổi giao diện">
         <i class="bi bi-stars"></i>
     </button>
     <button id="night-mode-toggle" class="theme-control-button" title="Chế độ Ngày/Đêm">
         <i class="bi bi-moon-stars-fill"></i>
     </button>
+    <button id="fishing-toggle" class="theme-control-button" title="Câu cá"><i class="bi bi-joystick"></i></button>
+    <div id="fish-basket" class="theme-control-button" title="Số cá câu được">
+        <i class="bi bi-bucket-fill me-2"></i>
+        <span id="fish-count">0</span>
+    </div>
     <div class="login-box">
         <div class="card card-outline card-primary shadow-lg rounded-4">
             <div class="card-header border-0 bg-transparent pt-4">
@@ -44,9 +49,9 @@
                         <div class="input-group-text"><span class="bi bi-lock-fill"></span></div>
                     </div>
                     <div class="row align-items-center">
-                            <div class="col-5">
-                                <div class="d-grid gap-2">
-                                    <button type="submit" class="btn btn-primary">Đăng nhập</button>
+                        <div class="col-5">
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">Đăng nhập</button>
 
 
                             </div>
