@@ -429,7 +429,7 @@ html.theme-animated .card {
     transition: all 0.2s ease-out;
 }
 
-span.badge.badge-warning, span.badge.badge-secondary{
+span.badge.badge-warning, span.badge.badge-secondary,span.badge.badge-primary{
     background-color: #ffc107 !important;
     color: #212529 !important;
 }

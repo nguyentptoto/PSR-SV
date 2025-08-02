@@ -14,6 +14,8 @@ class PdfPurchaseRequest extends Model
         'requester_id',
         'original_pdf_path',
         'signed_pdf_path',
+                'attachment_path', // <-- THÊM DÒNG NÀY
+
         'status',
         'remarks',
         'signature_pos_x',

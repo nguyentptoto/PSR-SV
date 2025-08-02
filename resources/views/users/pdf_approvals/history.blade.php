@@ -56,8 +56,8 @@
                         <th>Người tạo</th>
                         <th>Phòng ban</th>
                         <th>Trạng thái</th>
-                        <th>Ngày tạo</th>
-                        <th style="width: 100px;">Hành động</th>
+                        <th style="width:20%">Ngày tạo</th>
+                        <th style="width: 15%;">Hành động</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -87,7 +87,7 @@
                                 </a>
                                 @if ($pdfPr->signed_pdf_path)
                                     <a href="{{ asset('storage/' . $pdfPr->signed_pdf_path) }}" target="_blank" class="btn btn-sm btn-success" title="Xem file đã ký">
-                                        <i class="fas fa-file-pdf"></i>
+                                      pdf
                                     </a>
                                 @endif
                             </td>

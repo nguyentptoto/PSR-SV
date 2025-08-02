@@ -58,18 +58,60 @@
                     <p><strong>Nhà máy (Plant):</strong> {{ $pdfPurchaseRequest->requester->mainBranch->name ?? 'N/A' }}</p>
                     <p><strong>Trạng thái:</strong>
                         @php
+                            $statusText = '';
                             $statusClass = '';
                             switch ($pdfPurchaseRequest->status) {
-                                case 'pending_approval': $statusClass = 'badge badge-warning'; break;
-                                case 'approved': $statusClass = 'badge badge-success'; break;
-                                case 'rejected': $statusClass = 'badge badge-danger'; break;
-                                case 'completed': $statusClass = 'badge badge-info'; break;
-                                default: $statusClass = 'badge badge-secondary'; break;
+                                case 'pending_approval':
+                                    $statusText = 'Chờ duyệt';
+                                    $statusClass = 'badge badge-warning';
+                                    break;
+                                case 'approved':
+                                    $statusText = 'Đã duyệt';
+                                    $statusClass = 'badge badge-success';
+                                    break;
+                                case 'rejected':
+                                    $statusText = 'Từ chối';
+                                    $statusClass = 'badge badge-danger';
+                                    break;
+                                case 'completed':
+                                    $statusText = 'Hoàn thành';
+                                    $statusClass = 'badge badge-info';
+                                    break;
+                                case 'purchasing_approval':
+                                    $statusText = 'Đang chờ duyệt mua';
+                                    $statusClass = 'badge badge-primary';
+                                    break;
+                                case 'canceled':
+                                    $statusText = 'Đã hủy';
+                                    $statusClass = 'badge badge-secondary';
+                                    break;
+                                default:
+                                    $statusText = 'Không rõ';
+                                    $statusClass = 'badge badge-secondary';
+                                    break;
                             }
                         @endphp
-                        <span class="{{ $statusClass }}">{{ __($pdfPurchaseRequest->status) }}</span>
+                        <span class="{{ $statusClass }}">{{ $statusText }}</span>
                     </p>
-                    <p><strong>Cấp duyệt hiện tại:</strong> Cấp {{ $pdfPurchaseRequest->current_rank_level }}</p>
+                    <p>
+                        <strong>Cấp duyệt hiện tại:</strong>
+                        @php
+                            $rankLevel = $pdfPurchaseRequest->current_rank_level;
+                            $requesterGroup = App\Models\Group::where('name', 'Phòng Đề Nghị')->value('id');
+                            $purchasingGroup = App\Models\Group::where('name', 'Phòng Mua')->value('id');
+                            $userAssignment = Auth::user()->assignments->where('approvalRank.rank_level', $rankLevel)->first();
+
+                            $rankText = 'Cấp ' . $rankLevel;
+                            if ($userAssignment) {
+                                if ($userAssignment->group_id == $requesterGroup) {
+                                    $rankText = 'Phòng Đề Nghị Cấp ' . $rankLevel;
+                                } elseif ($userAssignment->group_id == $purchasingGroup) {
+                                    $rankText = 'Phòng Mua Cấp ' . $rankLevel;
+                                }
+                            }
+                        @endphp
+                        {{ $rankText }}
+                    </p>
                     <p><strong>Ngày tạo:</strong> {{ $pdfPurchaseRequest->created_at->format('d/m/Y H:i:s') }}</p>
                     <p><strong>Ghi chú:</strong> {{ $pdfPurchaseRequest->remarks ?? 'Không có' }}</p>
                 </div>
@@ -93,6 +135,14 @@
                             Chưa có
                         @endif
                     </p>
+                    {{-- THÊM PHẦN NÀY ĐỂ HIỂN THỊ FILE ĐÍNH KÈM --}}
+                    @if ($pdfPurchaseRequest->attachment_path)
+                        <p><strong>File đính kèm:</strong>
+                            <a href="{{ asset('storage/' . $pdfPurchaseRequest->attachment_path) }}" target="_blank" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-paperclip"></i> Xem file đính kèm
+                            </a>
+                        </p>
+                    @endif
                     <p><strong>Vị trí ký:</strong> Trang {{ $pdfPurchaseRequest->signature_page ?? 'N/A' }}, X: {{ $pdfPurchaseRequest->signature_pos_x ?? 'N/A' }}mm, Y: {{ $pdfPurchaseRequest->signature_pos_y ?? 'N/A' }}mm</p>
                     <p><strong>Kích thước ảnh ký:</strong> Rộng: {{ $pdfPurchaseRequest->signature_width ?? 'N/A' }}mm, Cao: {{ $pdfPurchaseRequest->signature_height ?? 'N/A' }}mm</p>
                 </div>
@@ -145,11 +195,23 @@
     </div>
 
     <div class="text-end">
+    @php
+        $pdfApprovalController = app(\App\Http\Controllers\Customer\PdfApprovalController::class);
+        $isApprover = $pdfApprovalController->userCanApprovePdf(Auth::user(), $pdfPurchaseRequest);
+    @endphp
+
+    @if ($isApprover)
+        <a href="{{ route('users.pdf-approvals.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Quay lại danh sách chờ duyệt
+        </a>
+    @else
         <a href="{{ route('users.pdf-requests.index') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Quay lại danh sách PDF
         </a>
-    </div>
+    @endif
+</div>
 
+    {{-- Modal xác nhận xóa cho PDF PR --}}
     <div class="modal fade" id="deletePdfConfirmationModal" tabindex="-1" aria-labelledby="deletePdfConfirmationModalLabel"
         aria-hidden="true">
         <div class="modal-dialog">
@@ -180,7 +242,7 @@
                     <h5 class="modal-title">Xác nhận Phê duyệt Phiếu PDF</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="{{ route('users.pdf-approvals.approve', $pdfPurchaseRequest->id) }}">
+                <form id="approve-pdf-form" method="POST" action="{{ route('users.pdf-approvals.approve', $pdfPurchaseRequest->id) }}">
                     @csrf
                     <div class="modal-body">
                         <p>Bạn có chắc chắn muốn phê duyệt phiếu PDF này không?</p>
@@ -205,7 +267,7 @@
                     <h5 class="modal-title">Lý do từ chối Phiếu PDF</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="{{ route('users.pdf-approvals.reject', $pdfPurchaseRequest->id) }}">
+                <form id="reject-pdf-form" method="POST" action="{{ route('users.pdf-approvals.reject', $pdfPurchaseRequest->id) }}">
                     @csrf
                     <div class="modal-body">
                         <div class="mb-3">
@@ -226,6 +288,7 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Script cho modal xóa
             const deletePdfModal = document.getElementById('deletePdfConfirmationModal');
             if (deletePdfModal) {
                 deletePdfModal.addEventListener('show.bs.modal', event => {
@@ -235,6 +298,27 @@
                     deleteForm.setAttribute('action', deleteUrl);
                 });
             }
+
+            // Script cho modal phê duyệt PDF
+            const approvePdfModal = document.getElementById('approvePdfModal');
+            if (approvePdfModal) {
+                approvePdfModal.addEventListener('show.bs.modal', event => {
+                    const form = approvePdfModal.querySelector('form');
+                    const actionUrl = `{{ route('users.pdf-approvals.approve', $pdfPurchaseRequest->id) }}`;
+                    form.setAttribute('action', actionUrl);
+                });
+            }
+
+            // Script cho modal từ chối PDF
+            const rejectPdfModal = document.getElementById('rejectPdfModal');
+            if (rejectPdfModal) {
+                rejectPdfModal.addEventListener('show.bs.modal', event => {
+                    const form = rejectPdfModal.querySelector('form');
+                    const actionUrl = `{{ route('users.pdf-approvals.reject', $pdfPurchaseRequest->id) }}`;
+                    form.setAttribute('action', actionUrl);
+                });
+            }
         });
     </script>
 @endpush
+

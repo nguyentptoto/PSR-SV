@@ -4,6 +4,39 @@
 @section('content')
     <h2 class="mb-4">Danh Sách Phiếu Đề Nghị (PDF)</h2>
 
+    {{-- Form Lọc Tìm Kiếm --}}
+    <div class="card card-outline card-primary mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Bộ lọc tìm kiếm</h3>
+        </div>
+        <div class="card-body">
+            <form id="filter-form" method="GET" action="{{ route('users.pdf-requests.index') }}">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="pia_code" class="form-label">Mã Phiếu (PR NO)</label>
+                        <input type="text" class="form-control" id="pia_code" name="pia_code" value="{{ request('pia_code') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="status" class="form-label">Trạng thái</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">-- Tất cả --</option>
+                            <option value="pending_approval" {{ request('status') == 'pending_approval' ? 'selected' : '' }}>Đang chờ duyệt</option>
+                            <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Đã phê duyệt</option>
+                            <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Đã từ chối</option>
+                            <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Đã hoàn thành</option>
+                            <option value="purchasing_approval" {{ request('status') == 'purchasing_approval' ? 'selected' : '' }}>Đang chờ duyệt mua</option>
+                            <option value="canceled" {{ request('status') == 'canceled' ? 'selected' : '' }}>Đã hủy</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-info me-2">Lọc</button>
+                        <a href="{{ route('users.pdf-requests.index') }}" class="btn btn-secondary">Reset</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     @if (session('success'))
         <div class="alert alert-success alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -45,38 +78,46 @@
                     <tbody>
                         @forelse ($pdfPurchaseRequests as $pdfPr)
                             <tr>
-                                <td>{{ $loop->iteration }}</td>
+                                <td>{{ $pdfPurchaseRequests->firstItem() + $loop->index }}</td>
                                 <td>{{ $pdfPr->pia_code }}</td>
                                 <td>{{ $pdfPr->requester->name ?? 'N/A' }}</td>
                                 <td>
-    @php
-        $statusClass = '';
-        $statusText = '';
-        switch ($pdfPr->status) {
-            case 'pending_approval':
-                $statusClass = 'badge badge-warning';
-                $statusText = 'Đang chờ duyệt';
-                break;
-            case 'approved':
-                $statusClass = 'badge badge-success';
-                $statusText = 'Đã phê duyệt';
-                break;
-            case 'rejected':
-                $statusClass = 'badge badge-danger';
-                $statusText = 'Đã từ chối';
-                break;
-            case 'completed':
-                $statusClass = 'badge badge-info';
-                $statusText = 'Đã hoàn thành';
-                break;
-            default:
-                $statusClass = 'badge badge-secondary';
-                $statusText = $pdfPr->status; // Giữ nguyên nếu không có trong danh sách
-                break;
-        }
-    @endphp
-    <span class="{{ $statusClass }}">{{ $statusText }}</span>
-</td>
+                                    @php
+                                        $statusClass = '';
+                                        $statusText = '';
+                                        switch ($pdfPr->status) {
+                                            case 'pending_approval':
+                                                $statusClass = 'badge badge-warning';
+                                                $statusText = 'Đang chờ duyệt';
+                                                break;
+                                            case 'approved':
+                                                $statusClass = 'badge badge-success';
+                                                $statusText = 'Đã phê duyệt';
+                                                break;
+                                            case 'rejected':
+                                                $statusClass = 'badge badge-danger';
+                                                $statusText = 'Đã từ chối';
+                                                break;
+                                            case 'completed':
+                                                $statusClass = 'badge badge-info';
+                                                $statusText = 'Đã hoàn thành';
+                                                break;
+                                            case 'purchasing_approval':
+                                                $statusClass = 'badge badge-primary';
+                                                $statusText = 'Đang chờ duyệt mua';
+                                                break;
+                                            case 'canceled':
+                                                $statusClass = 'badge badge-secondary';
+                                                $statusText = 'Đã hủy';
+                                                break;
+                                            default:
+                                                $statusClass = 'badge badge-secondary';
+                                                $statusText = $pdfPr->status; // Giữ nguyên nếu không có trong danh sách
+                                                break;
+                                        }
+                                    @endphp
+                                    <span class="{{ $statusClass }}">{{ $statusText }}</span>
+                                </td>
                                 <td>Cấp {{ $pdfPr->current_rank_level }}</td>
                                 <td>{{ $pdfPr->created_at->format('d/m/Y H:i') }}</td>
                                 <td>
@@ -90,7 +131,7 @@
                                         <a href="{{ route('users.pdf-requests.preview-sign', $pdfPr->id) }}" class="btn btn-warning btn-sm">
                                             <i class="fas fa-signature"></i> Ký lại
                                         </a>
-                                    @elseif ($pdfPr->status === 'pending_approval' && $pdfPr->signed_pdf_path)
+                                    @elseif ($pdfPr->signed_pdf_path)
                                         {{-- SỬ DỤNG asset() CHO FILE ĐÃ KÝ --}}
                                         <a href="{{ asset('storage/' . $pdfPr->signed_pdf_path) }}" target="_blank" class="btn btn-secondary btn-sm">
                                             <i class="fas fa-file-pdf"></i> Xem PDF đã ký
@@ -108,8 +149,8 @@
                                             <i class="fas fa-edit"></i>
                                         </a>
                                         <button type="button" class="btn btn-danger btn-sm" title="Xóa"
-                                            data-bs-toggle="modal" data-bs-target="#deletePdfConfirmationModal"
-                                            data-delete-url="{{ route('users.pdf-requests.destroy', $pdfPr->id) }}">
+                                                data-bs-toggle="modal" data-bs-target="#deletePdfConfirmationModal"
+                                                data-delete-url="{{ route('users.pdf-requests.destroy', $pdfPr->id) }}">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     @endif
@@ -125,7 +166,7 @@
             </div>
         </div>
         <div class="card-footer clearfix">
-            {{ $pdfPurchaseRequests->links() }}
+            {{ $pdfPurchaseRequests->appends(request()->query())->links() }}
         </div>
     </div>
 

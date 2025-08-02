@@ -5,16 +5,39 @@ Xin chào,
 
 Bạn có một phiếu đề nghị mới cần được xử lý.
 
-**Mã Phiếu:** {{ $purchaseRequest->pia_code }}
-**Người tạo:** {{ $purchaseRequest->requester->name }}
-**Trạng thái hiện tại:** Chờ duyệt {{ $purchaseRequest->status_text }} (Cấp {{ $purchaseRequest->current_rank_level }})
+{{-- Kiểm tra xem có phải phiếu Excel hay không --}}
+@if(isset($purchaseRequest) && $purchaseRequest)
+    **Loại phiếu:** Excel
+    **Mã Phiếu:** {{ $purchaseRequest->pia_code }}
+    **Người tạo:** {{ $purchaseRequest->requester->name }}
+    **Trạng thái hiện tại:** Chờ duyệt {{ $purchaseRequest->status_text }} (Cấp {{ $purchaseRequest->current_rank_level }})
 
-Vui lòng nhấn vào nút bên dưới để xem chi tiết và thực hiện hành động.
+    Vui lòng nhấn vào nút bên dưới để xem chi tiết và thực hiện hành động.
 
-@component('mail::button', ['url' => route('users.purchase-requests.show', $purchaseRequest->id)])
-Xem chi tiết Phiếu
-@endcomponent
+    @component('mail::button', ['url' => route('users.purchase-requests.show', $purchaseRequest->id)])
+        Xem chi tiết Phiếu
+    @endcomponent
 
-Cảm ơn,<br>
-{{ config('app.name') }}
+{{-- Kiểm tra xem có phải phiếu PDF hay không --}}
+@elseif(isset($pdfPurchaseRequest) && $pdfPurchaseRequest)
+    **Loại phiếu:** PDF
+    **Mã Phiếu:** {{ $pdfPurchaseRequest->pia_code }}
+    **Người tạo:** {{ $pdfPurchaseRequest->requester->name }}
+    **Trạng thái hiện tại:** Chờ duyệt (Cấp {{ $pdfPurchaseRequest->current_rank_level }})
+
+    Vui lòng nhấn vào nút bên dưới để xem chi tiết và thực hiện hành động.
+
+    @component('mail::button', ['url' => route('users.pdf-requests.show', $pdfPurchaseRequest->id)])
+        Xem chi tiết Phiếu
+    @endcomponent
+
+{{-- Trường hợp không xác định (phòng khi có lỗi) --}}
+@else
+    <p>Thông báo phiếu đề nghị không xác định.</p>
+@endif
+<div class="footer" style="margin: 0 auto; padding: 20px; text-align: center; font-size: 12px; color: #999;">
+    <p>Trân trọng,</p>
+    <p>Cảm ơn,<br></p>
+</div>
+
 @endcomponent

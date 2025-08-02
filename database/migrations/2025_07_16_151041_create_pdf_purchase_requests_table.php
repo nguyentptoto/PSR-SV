@@ -18,6 +18,8 @@ return new class extends Migration
             $table->string('original_pdf_path'); // Đường dẫn tới file PDF gốc đã upload
             $table->string('signed_pdf_path')->nullable(); // Đường dẫn tới file PDF đã ký
 
+            $table->string('attachment_path')->nullable(); // <-- Dòng này đã được thêm
+
             $table->string('status')->default('pending_approval'); // pending_approval, completed, rejected
             $table->text('rejection_reason')->nullable(); // THÊM CỘT NÀY VÀO ĐÂY
 

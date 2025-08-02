@@ -241,12 +241,26 @@
         // Xử lý modal duyệt hàng loạt
         $('#bulkApprovePdfModal').on('show.bs.modal', function (event) {
             const selectedCount = $('input.request-checkbox-pdf:checked').length;
+
+            // Xóa các input cũ để tránh trùng lặp
+            $('#bulk-approve-pdf-form').find('input[name="request_ids[]"]').remove();
+
             if (selectedCount === 0) {
                 alert('Vui lòng chọn ít nhất một phiếu để duyệt.');
                 event.preventDefault();
                 return;
             }
+
+            // Cập nhật số lượng
             $('#selected-pdf-count').text(selectedCount);
+
+            // Thêm các input đã chọn vào form trong modal
+            $('input.request-checkbox-pdf:checked').each(function() {
+                // Tạo một bản sao của checkbox đã chọn và thêm vào form
+                $('#bulk-approve-pdf-form').append(
+                    $('<input>').attr('type', 'hidden').attr('name', 'request_ids[]').val($(this).val())
+                );
+            });
         });
     });
 </script>

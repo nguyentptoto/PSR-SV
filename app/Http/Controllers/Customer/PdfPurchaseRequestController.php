@@ -28,13 +28,25 @@ class PdfPurchaseRequestController extends Controller
 {
     public function index(Request $request)
     {
-        $pdfPurchaseRequests = PdfPurchaseRequest::where('requester_id', Auth::id())
-            ->latest()
-            ->paginate(15);
+        $query = PdfPurchaseRequest::where('requester_id', Auth::id());
+
+        // Lọc theo pia_code
+        if ($request->filled('pia_code')) {
+            $query->where('pia_code', 'like', '%' . $request->input('pia_code') . '%');
+        }
+
+        // Lọc theo status
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        // Lọc theo người yêu cầu (đã được lọc mặc định là Auth::id())
+        // Nếu muốn thêm lọc theo người yêu cầu khác (cho admin), bạn có thể thêm logic ở đây.
+
+        $pdfPurchaseRequests = $query->latest()->paginate(15);
 
         return view('users.pdf_requests.index', compact('pdfPurchaseRequests'));
     }
-
    public function create()
     {
         $user = Auth::user();
@@ -69,7 +81,10 @@ class PdfPurchaseRequestController extends Controller
             'signature_width' => 'nullable|numeric',
             'signature_height' => 'nullable|numeric',
             'signature_page' => 'nullable|integer|min:1',
-            'requires_director_approval' => 'nullable',
+            'requires_director_approval' => 'sometimes|boolean',
+
+            // Validation cho 1 file đính kèm duy nhất
+            'attachment' => 'nullable|file|mimes:pdf,xlsx,xls,doc,docx|max:10240',
         ]);
 
         DB::beginTransaction();
@@ -79,6 +94,16 @@ class PdfPurchaseRequestController extends Controller
             $extension = $file->getClientOriginalExtension();
             $newFileName = $piaCode . '_' . time() . '.' . $extension;
             $originalPdfPath = $file->storeAs('pr_pdfs/originals', $newFileName, 'public');
+
+            // Xử lý file đính kèm
+            $attachmentPath = null;
+            if ($request->hasFile('attachment')) {
+                $attachmentFile = $request->file('attachment');
+                $attachmentExtension = $attachmentFile->getClientOriginalExtension();
+               // Tạo tên file đính kèm với tiền tố ATT và mã PR
+$newAttachmentName = 'ATT_' . $piaCode  . $attachmentExtension;
+                $attachmentPath = $attachmentFile->storeAs('pr_pdfs/attachments', $newAttachmentName, 'public');
+            }
 
             $pdfRequest = PdfPurchaseRequest::create([
                 'pia_code' => $piaCode,
@@ -92,12 +117,13 @@ class PdfPurchaseRequestController extends Controller
                 'signature_width' => $validated['signature_width'] ?? null,
                 'signature_height' => $validated['signature_height'] ?? null,
                 'signature_page' => $validated['signature_page'] ?? null,
-                'requires_director_approval' => (bool)$request->input('requires_director_approval'),
+                'requires_director_approval' => $request->boolean('requires_director_approval'),
+                'attachment_path' => $attachmentPath, // Gán đường dẫn file đính kèm
             ]);
 
             DB::commit();
 
-            return redirect()->route('users.pdf-requests.preview-sign', $pdfRequest->id)->with('success', 'File PDF đã được tải lên thành công. Vui lòng ký để hoàn tất.');
+            return redirect()->route('users.pdf-requests.preview-sign', $pdfRequest->id)->with('success', 'File PDF và tệp đính kèm đã được tải lên thành công. Vui lòng ký để hoàn tất.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -299,7 +325,9 @@ class PdfPurchaseRequestController extends Controller
                 }
             }
 
-            $signedPdfFileName = 'PR_Signed_' . $pdfPurchaseRequest->pia_code . '_' . time() . '.pdf';
+
+// Tạo tên file mới với mã PR và một chuỗi ngẫu nhiên ngắn gọn
+            $signedPdfFileName = 'PR_' . $pdfPurchaseRequest->pia_code .  '.pdf';
             $signedPdfPath = 'pr_pdfs/signed/' . $signedPdfFileName;
             $outputFilePath = Storage::disk('public')->path($signedPdfPath);
             Storage::disk('public')->makeDirectory('pr_pdfs/signed');
@@ -336,6 +364,12 @@ class PdfPurchaseRequestController extends Controller
             $nextApprovers = $pdfApprovalController->findNextApproversForPdfPurchaseRequest($pdfPurchaseRequest);
 
             if ($nextApprovers->isNotEmpty()) {
+                 // Sửa đổi: Bỏ comment và sử dụng logic gửi email
+            foreach ($nextApprovers as $approver) {
+                if ($approver->email) {
+                    \Mail::to($approver->email)->queue(new \App\Mail\PurchaseRequestNotification($pdfPurchaseRequest));
+                }
+            }
                  Log::info('DEBUG: PDF Notification would be dispatched for PR: ' . $pdfPurchaseRequest->id . '. (Email functionality removed)');
             } else {
                 Log::info('DEBUG: No next approvers found for PDF PR: ' . $pdfPurchaseRequest->id . '. No notification dispatched.');

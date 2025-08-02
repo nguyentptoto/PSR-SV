@@ -381,7 +381,16 @@ class PdfApprovalController extends Controller
 
             DB::commit();
 
-            Log::info('DEBUG: Approval notification WOULD BE dispatched for ' . class_basename($model) . ' ' . $model->pia_code . '. (Email functionality removed)');
+            // Gửi email thông báo cho người duyệt tiếp theo
+            $nextApprovers = $this->findNextApproversForPdfPurchaseRequest($model);
+            if ($nextApprovers->isNotEmpty()) {
+                foreach ($nextApprovers as $approver) {
+                    if ($approver->email) {
+                        \Mail::to($approver->email)->queue(new \App\Mail\PurchaseRequestNotification($model));
+                    }
+                }
+            }
+            Log::info('DEBUG: Approval notification dispatched for ' . class_basename($model) . ' ' . $model->pia_code . '.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Perform Approval Error for PDF PR {$model->id}: " . $e->getMessage());
@@ -417,7 +426,11 @@ class PdfApprovalController extends Controller
             'comment' => $comment,
             'signature_position' => null,
         ]);
-
+          // Gửi email thông báo cho người tạo khi phiếu bị từ chối
+        $requester = $model->requester;
+        if ($requester && $requester->email) {
+            \Mail::to($requester->email)->queue(new \App\Mail\PurchaseRequestNotification($model));
+        }
         Log::info('DEBUG: Rejection notification WOULD BE dispatched for ' . class_basename($model) . ' ' . $model->pia_code . '. (Email functionality removed)');
     }
 
