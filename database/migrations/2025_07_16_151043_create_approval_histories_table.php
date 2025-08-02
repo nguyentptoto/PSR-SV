@@ -6,12 +6,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('approval_histories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('purchase_request_id')->constrained('purchase_requests')->onDelete('cascade');
-            $table->foreignId('user_id')->constrained('users');
+            // THAY ĐỔI DÒNG NÀY ĐỂ purchase_request_id CHO PHÉP NULL
+            $table->foreignId('purchase_request_id')->nullable()->constrained('purchase_requests')->onDelete('cascade');
+
+            // DÒNG NÀY ĐÃ CÓ TRONG CODE CỦA BẠN VÀ ĐÃ ĐÚNG LÀ NULLABLE VÀ SAU purchase_request_id
+            $table->foreignId('pdf_purchase_request_id')->nullable()->constrained('pdf_purchase_requests')->onDelete('cascade');
+
+            $table->foreignId('user_id')->constrained('users'); // Dòng này thường nằm ở đây
+
             $table->string('rank_at_approval');
             $table->string('action'); // created, approved, rejected, updated
             $table->string('signature_image_path')->nullable();
@@ -20,6 +29,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('approval_histories');

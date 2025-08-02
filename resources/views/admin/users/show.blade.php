@@ -22,7 +22,7 @@
                     </p>
                     @if ($user->signature_image_path)
                         <p><strong>Chữ ký:</strong></p>
-                        <img src="{{ Storage::url($user->signature_image_path) }}" alt="Chữ ký" height="150">
+                        <img src="{{ asset('storage/' . $user->signature_image_path) }}" alt="Chữ ký" height="150">
                     @endif
                 </div>
             </div>

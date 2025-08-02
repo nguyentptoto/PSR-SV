@@ -32,6 +32,8 @@ return new class extends Migration
             $table->string('attachment_path')->nullable();
             $table->string('rejection_reason')->nullable();
 
+              // ✅ THÊM MỚI: Cột để lưu ID của nhân viên mua hàng được phân công
+            $table->foreignId('assigned_purchaser_id')->nullable()->constrained('users')->onDelete('set null');
             $table->integer('current_rank_level')->default(1);
             $table->boolean('requires_director_approval')->default(false);
 

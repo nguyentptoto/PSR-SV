@@ -27,9 +27,7 @@ return new class extends Migration
             $table->string('using_dept_code')->nullable();
             $table->string('plant_system')->nullable();
 
-            // THÊM CÁC CỘT MỚI TẠI ĐÂY CHO PURCHASE REQUEST ITEMS
-            // $table->string('purchase_group', 20)->nullable(); // Từ PGr
-            // $table->string('legacy_item_code', 255)->nullable(); // Từ cột A (Cột B)
+
 
             $table->timestamps();
         });

@@ -110,6 +110,12 @@ $(document).ready(function () {
         // Kích hoạt sự kiện change
         $("#sections-select2").trigger("change");
     });
+    // ✅ THÊM MỚI: Kích hoạt Select2 cho ô chọn người quản lý
+        $('#manager-select2').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Chọn người quản lý',
+            allowClear: true
+        });
 });
 
 

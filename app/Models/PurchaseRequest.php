@@ -104,4 +104,8 @@ class PurchaseRequest extends Model
                 return 'bg-secondary';
         }
     }
+    public function assignedPurchaser()
+    {
+        return $this->belongsTo(User::class, 'assigned_purchaser_id');
+    }
 }

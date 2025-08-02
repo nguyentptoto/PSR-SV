@@ -294,4 +294,3 @@ class ApprovalController extends Controller
         return redirect()->route('users.approvals.index')->with('success', $message);
     }
 }
-

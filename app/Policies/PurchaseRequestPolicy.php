@@ -23,7 +23,10 @@ class PurchaseRequestPolicy
         if (in_array($purchaseRequest->status, ['completed', 'rejected'])) {
             return false;
         }
-
+          // ✅ QUY TẮC MỚI: Cho phép duyệt nếu người dùng là người được phân công
+        if ($purchaseRequest->assigned_purchaser_id === $user->id) {
+            return true;
+        }
         $isRequestingStage = $purchaseRequest->status === 'pending_approval';
         $isPurchasingStage = $purchaseRequest->status === 'purchasing_approval';
 

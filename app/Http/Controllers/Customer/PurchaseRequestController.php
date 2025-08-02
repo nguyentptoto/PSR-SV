@@ -23,8 +23,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Imports\PurchaseRequestsImport;
 use ZipArchive;
-
-
+use App\Models\PdfPurchaseRequest; // Import the new PDF model
+use setasign\Fpdi\Tcpdf\Fpdi; // Import FPDI with TCPDF
+use Symfony\Component\HttpFoundation\StreamedResponse; // Import
 class PurchaseRequestController extends Controller
 {
     public function index()
@@ -75,6 +76,7 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
+            'items.*.purchase_group' => 'nullable|string|max:20', // This column was removed from DB, but still in validation
 
         ]);
 
@@ -211,6 +213,7 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
+            'items.*.purchase_group' => 'nullable|string|max:20',
 
         ]);
 
@@ -336,7 +339,7 @@ class PurchaseRequestController extends Controller
         return $approverQuery->get();
     }
 
-     public function importPreview(Request $request)
+    public function importPreview(Request $request)
     {
         // GHI CÁC THÔNG TIN REQUEST VÀO LOG ĐỂ DEBUG
         Log::info('--- Bắt đầu Debug ImportPreview Request ---');
@@ -385,7 +388,7 @@ class PurchaseRequestController extends Controller
             // Lưu cả đường dẫn thư mục tạm cho việc cleanup sau này
             $sessionData = [
                 'purchase_requests' => $importedData,
-                 'temp_attachments_dir' => null // Set to null as no ZIP is processed
+                'temp_attachments_dir' => null // Set to null as no ZIP is processed
             ];
             $request->session()->put('imported_purchase_requests_' . $sessionId, $sessionData);
 
@@ -415,7 +418,7 @@ class PurchaseRequestController extends Controller
         }
     }
 
-     public function showImportPreview(Request $request)
+    public function showImportPreview(Request $request)
     {
         $sessionId = $request->query('session_id');
         $sessionData = $request->session()->get('imported_purchase_requests_' . $sessionId);
@@ -436,7 +439,7 @@ class PurchaseRequestController extends Controller
         return view('users.purchase_requests.import_preview', compact('importedPurchaseRequests', 'executingDepartments', 'user', 'sessionId', 'tempAttachmentsDir'));
     }
 
-     public function createFromImport(Request $request)
+    public function createFromImport(Request $request)
     {
         Log::info('--- Bắt đầu Debug createFromImport Request ---');
         Log::info('Timestamp start: ' . microtime(true));
@@ -487,7 +490,7 @@ class PurchaseRequestController extends Controller
             if (isset($uploadedAttachments[$prIndex]) && $uploadedAttachments[$prIndex] instanceof \Illuminate\Http\UploadedFile) {
                 $individualUploadedFile = $uploadedAttachments[$prIndex];
             } else if (isset($uploadedAttachments[$prIndex]['attachment_file']) && $uploadedAttachments[$prIndex]['attachment_file'] instanceof \Illuminate\Http\UploadedFile) {
-                 $individualUploadedFile = $uploadedAttachments[$prIndex]['attachment_file'];
+                $individualUploadedFile = $uploadedAttachments[$prIndex]['attachment_file'];
             }
 
             // Validate file upload thủ công
@@ -540,7 +543,7 @@ class PurchaseRequestController extends Controller
             $finalPrData['requester_id'] = $requester->id;
             $finalPrData['branch_id'] = $branch->id;
             $finalPrData['section_id'] = $section->id;
-            $finalPrData['requires_director_approval'] = (bool)($finalPrData['requires_director_approval'] ?? false);
+            $finalPrData['requires_director_approval'] = (bool) ($finalPrData['requires_director_approval'] ?? false);
 
             DB::beginTransaction();
             try {
@@ -559,8 +562,7 @@ class PurchaseRequestController extends Controller
                     $newFileName = $purchaseRequest->pia_code . '_' . time() . '.' . $extension; // Đổi tên file
                     $finalAttachmentPath = $individualUploadedFile->storeAs('pr_attachments', $newFileName, 'public');
                     Log::info('DEBUG: Individual file stored at: ' . $finalAttachmentPath . '. Timestamp: ' . microtime(true));
-                }
-                else {
+                } else {
                     Log::info('DEBUG: No attachment found or uploaded for PR: ' . $purchaseRequest->pia_code);
                 }
 
@@ -604,13 +606,6 @@ class PurchaseRequestController extends Controller
         }
 
         Log::info('DEBUG: All PRs processed. Starting cleanup. Timestamp: ' . microtime(true));
-        // Không còn thư mục tạm từ ZIP để xóa
-        // if ($originalTempAttachmentsDir && Storage::disk('local')->exists($originalTempAttachmentsDir)) {
-        //     Storage::disk('local')->deleteDirectory($originalTempAttachmentsDir);
-        //     Log::info('DEBUG: Temporary attachment directory cleaned up. Timestamp: ' . microtime(true));
-        // } else {
-        //     Log::info('DEBUG: No temporary attachment directory to clean up or path is null.');
-        // }
         $request->session()->forget('imported_purchase_requests_' . $sessionId);
         Log::info('DEBUG: Session data forgotten. Timestamp: ' . microtime(true));
 
@@ -667,4 +662,19 @@ class PurchaseRequestController extends Controller
         // Tải file ZIP về cho người dùng và tự động xóa sau khi tải xong
         return response()->download($tempZipPath, $zipFileName)->deleteFileAfterSend(true);
     }
+
+
+    private function storeFile($file, $piaCode)
+    {
+        Log::info("DEBUG: Bắt đầu lưu file: {$file->getClientOriginalName()} cho PR: {$piaCode}");
+        $extension = $file->getClientOriginalExtension();
+        $newFileName = $piaCode . '_' . time() . '.' . $extension;
+        $finalPath = $file->storeAs('pr_attachments', $newFileName, 'public'); // Lưu vào thư mục public disk
+        Log::info("DEBUG: File đã lưu vào: {$finalPath}");
+        return $finalPath;
+    }
+
+
+
+
 }

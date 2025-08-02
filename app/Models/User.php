@@ -86,4 +86,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(ApprovalHistory::class);
     }
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    /**
+     * Lấy danh sách các nhân viên cấp dưới.
+     */
+    public function subordinates()
+    {
+        return $this->hasMany(User::class, 'manager_id');
+    }
+     public function pdfPurchaseRequests() // <-- THÊM MỐI QUAN HỆ NÀY
+    {
+        return $this->hasMany(PdfPurchaseRequest::class, 'requester_id');
+    }
 }

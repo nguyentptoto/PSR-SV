@@ -29,6 +29,10 @@ class DashboardController extends Controller
             ->latest()
             ->take(5)
             ->get();
+          // ✅ THÊM MỚI: Đếm số phiếu đang được phân công cho người dùng này
+        $assignedRequestsCount = PurchaseRequest::where('assigned_purchaser_id', $user->id)
+            ->where('status', 'purchasing_approval') // Chỉ đếm các phiếu đang hoạt động
+            ->count();
 
         // ✅ SỬA LỖI: Thêm biến 'user' vào hàm compact()
         return view('dashboard', compact(
@@ -37,7 +41,8 @@ class DashboardController extends Controller
             'completedRequests',
             'pendingRequests',
             'rejectedRequests',
-            'recentRequests'
+            'recentRequests',
+            'assignedRequestsCount' // ✅ Truyền biến mới ra view
         ));
     }
 }
