@@ -23,7 +23,7 @@ use setasign\Fpdi\Tcpdf\Fpdi;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
-
+use App\Jobs\SendPdfApprovalNotification; // Import job for PDF approval notifications
 class PdfPurchaseRequestController extends Controller
 {
     public function index(Request $request)
@@ -47,7 +47,7 @@ class PdfPurchaseRequestController extends Controller
 
         return view('users.pdf_requests.index', compact('pdfPurchaseRequests'));
     }
-   public function create()
+    public function create()
     {
         $user = Auth::user();
         $user->load('sections', 'mainBranch');
@@ -100,8 +100,8 @@ class PdfPurchaseRequestController extends Controller
             if ($request->hasFile('attachment')) {
                 $attachmentFile = $request->file('attachment');
                 $attachmentExtension = $attachmentFile->getClientOriginalExtension();
-               // Tạo tên file đính kèm với tiền tố ATT và mã PR
-$newAttachmentName = 'ATT_' . $piaCode  . $attachmentExtension;
+                // Tạo tên file đính kèm với tiền tố ATT và mã PR
+                $newAttachmentName = 'ATT_' . $piaCode . $attachmentExtension;
                 $attachmentPath = $attachmentFile->storeAs('pr_pdfs/attachments', $newAttachmentName, 'public');
             }
 
@@ -138,9 +138,9 @@ $newAttachmentName = 'ATT_' . $piaCode  . $attachmentExtension;
 
         $pdfApprovalController = app(PdfApprovalController::class);
         $canView = $pdfPurchaseRequest->requester_id === $user->id ||
-                   $user->can('is-admin') ||
-                   $pdfPurchaseRequest->approvalHistories()->where('user_id', $user->id)->exists() ||
-                   $pdfApprovalController->userCanApprovePdf($user, $pdfPurchaseRequest);
+            $user->can('is-admin') ||
+            $pdfPurchaseRequest->approvalHistories()->where('user_id', $user->id)->exists() ||
+            $pdfApprovalController->userCanApprovePdf($user, $pdfPurchaseRequest);
 
         abort_if(!$canView, 403, 'Bạn không có quyền xem phiếu PDF này.');
 
@@ -183,10 +183,15 @@ $newAttachmentName = 'ATT_' . $piaCode  . $attachmentExtension;
         DB::beginTransaction();
         try {
             $updateData = $request->only([
-                'pia_code', 'remarks', 'signature_pos_x', 'signature_pos_y',
-                'signature_width', 'signature_height', 'signature_page',
+                'pia_code',
+                'remarks',
+                'signature_pos_x',
+                'signature_pos_y',
+                'signature_width',
+                'signature_height',
+                'signature_page',
             ]);
-            $updateData['requires_director_approval'] = (bool)$request->input('requires_director_approval');
+            $updateData['requires_director_approval'] = (bool) $request->input('requires_director_approval');
 
             $pdfPurchaseRequest->update($updateData);
 
@@ -326,8 +331,8 @@ $newAttachmentName = 'ATT_' . $piaCode  . $attachmentExtension;
             }
 
 
-// Tạo tên file mới với mã PR và một chuỗi ngẫu nhiên ngắn gọn
-            $signedPdfFileName = 'PR_' . $pdfPurchaseRequest->pia_code .  '.pdf';
+            // Tạo tên file mới với mã PR và một chuỗi ngẫu nhiên ngắn gọn
+            $signedPdfFileName = 'PR_' . $pdfPurchaseRequest->pia_code . '.pdf';
             $signedPdfPath = 'pr_pdfs/signed/' . $signedPdfFileName;
             $outputFilePath = Storage::disk('public')->path($signedPdfPath);
             Storage::disk('public')->makeDirectory('pr_pdfs/signed');
@@ -364,15 +369,13 @@ $newAttachmentName = 'ATT_' . $piaCode  . $attachmentExtension;
             $nextApprovers = $pdfApprovalController->findNextApproversForPdfPurchaseRequest($pdfPurchaseRequest);
 
             if ($nextApprovers->isNotEmpty()) {
-                 // Sửa đổi: Bỏ comment và sử dụng logic gửi email
-            foreach ($nextApprovers as $approver) {
-                if ($approver->email) {
-                    \Mail::to($approver->email)->queue(new \App\Mail\PurchaseRequestNotification($pdfPurchaseRequest));
+                foreach ($nextApprovers as $approver) {
+                    // Đúng: Dispatch job đúng cho quy trình PDF
+                    SendPdfApprovalNotification::dispatch($pdfPurchaseRequest, $approver);
                 }
-            }
-                 Log::info('DEBUG: PDF Notification would be dispatched for PR: ' . $pdfPurchaseRequest->id . '. (Email functionality removed)');
+                Log::info('DEBUG: PDF Notification jobs have been dispatched for PR: ' . $pdfPurchaseRequest->id);
             } else {
-                Log::info('DEBUG: No next approvers found for PDF PR: ' . $pdfPurchaseRequest->id . '. No notification dispatched.');
+                Log::info('DEBUG: PDF Notification would be dispatched for PR: ' . $pdfPurchaseRequest->id . '. (Email functionality removed)');
             }
 
             return redirect()->route('users.pdf-requests.index')->with('success', 'Phiếu PDF đã được ký và gửi đi duyệt thành công!');

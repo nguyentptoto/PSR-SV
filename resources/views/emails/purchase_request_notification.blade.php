@@ -30,14 +30,8 @@ Bạn có một phiếu đề nghị mới cần được xử lý.
     @component('mail::button', ['url' => route('users.pdf-requests.show', $pdfPurchaseRequest->id)])
         Xem chi tiết Phiếu
     @endcomponent
+@endif {{-- ✅ SỬA LỖI: Thêm @endif để đóng khối lệnh --}}
 
-{{-- Trường hợp không xác định (phòng khi có lỗi) --}}
-@else
-    <p>Thông báo phiếu đề nghị không xác định.</p>
-@endif
-<div class="footer" style="margin: 0 auto; padding: 20px; text-align: center; font-size: 12px; color: #999;">
-    <p>Trân trọng,</p>
-    <p>Cảm ơn,<br></p>
-</div>
-
+Cảm ơn,<br>
+{{ config('app.name') }}
 @endcomponent

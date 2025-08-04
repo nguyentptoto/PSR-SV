@@ -26,6 +26,7 @@ use ZipArchive;
 use App\Models\PdfPurchaseRequest; // Import the new PDF model
 use setasign\Fpdi\Tcpdf\Fpdi; // Import FPDI with TCPDF
 use Symfony\Component\HttpFoundation\StreamedResponse; // Import
+
 class PurchaseRequestController extends Controller
 {
     public function index()
@@ -146,9 +147,12 @@ class PurchaseRequestController extends Controller
 
             DB::commit();
 
+            // ... bên trong hàm store()
             $nextApprovers = $this->findNextApprovers($purchaseRequest);
             if ($nextApprovers->isNotEmpty()) {
-                SendApprovalNotification::dispatch($purchaseRequest, $nextApprovers);
+                foreach ($nextApprovers as $approver) {
+                    SendApprovalNotification::dispatch($purchaseRequest, $approver);
+                }
             }
 
             return redirect()->route('users.purchase-requests.index')->with('success', 'Tạo phiếu đề nghị thành công!');
@@ -297,7 +301,7 @@ class PurchaseRequestController extends Controller
         return Excel::download(new PurchaseRequestExport($purchaseRequest), $fileName);
     }
 
-    public function exportPdf(PurchaseRequest $purchaseRequest)
+     public function exportPdf(PurchaseRequest $purchaseRequest)
     {
         $purchaseRequest->load('requester', 'branch', 'executingDepartment', 'items', 'approvalHistories.user');
         $fileName = 'PR-' . $purchaseRequest->pia_code . '.pdf';
@@ -589,10 +593,13 @@ class PurchaseRequestController extends Controller
                 $successfulPiaCodes[] = $finalPrData['pia_code'];
 
                 Log::info('DEBUG: Before sending notification for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+                // ... bên trong hàm createFromImport(), trong vòng lặp foreach
                 $nextApprovers = $this->findNextApprovers($purchaseRequest);
                 if ($nextApprovers->isNotEmpty()) {
-                    SendApprovalNotification::dispatch($purchaseRequest, $nextApprovers);
-                    Log::info('DEBUG: Notification dispatched for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+                    foreach ($nextApprovers as $approver) {
+                        SendApprovalNotification::dispatch($purchaseRequest, $approver);
+                    }
+                    Log::info('DEBUG: Notification jobs dispatched for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
                 } else {
                     Log::info('DEBUG: No next approvers found for PR: ' . $purchaseRequest->id . '. No notification dispatched.');
                 }

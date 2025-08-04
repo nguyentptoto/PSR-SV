@@ -104,19 +104,17 @@ class PdfApprovalController extends Controller
             abort(403, 'Bạn không có quyền duyệt phiếu PDF này.');
         }
 
-        $request->validate([
-            'comment' => 'nullable|string|max:2000',
-        ]);
+        $request->validate(['comment' => 'nullable|string|max:2000']);
 
         DB::beginTransaction();
         try {
-            $this->performApproval($pdfPurchaseRequest, $request->comment);
+            $this->performApprovalLogic($pdfPurchaseRequest, $request->comment);
             DB::commit();
             return back()->with('success', "Đã duyệt phiếu PDF {$pdfPurchaseRequest->pia_code} thành công.");
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Approve Error for PDF PR {$pdfPurchaseRequest->id}: " . $e->getMessage());
-            return back()->with('error', "Lỗi khi duyệt phiếu PDF {$pdfPurchaseRequest->pia_code}: " . $e->getMessage());
+            return back()->with('error', "Lỗi khi duyệt phiếu PDF: " . $e->getMessage());
         }
     }
 
@@ -125,20 +123,17 @@ class PdfApprovalController extends Controller
         if (!$this->userCanApprovePdf(Auth::user(), $pdfPurchaseRequest)) {
             abort(403, 'Bạn không có quyền từ chối phiếu PDF này.');
         }
-
-        $request->validate([
-            'comment' => 'required|string|max:2000',
-        ]);
+        $request->validate(['comment' => 'required|string|max:2000']);
 
         DB::beginTransaction();
         try {
-            $this->performRejection($pdfPurchaseRequest, $request->comment);
+            $this->performRejectionLogic($pdfPurchaseRequest, $request->comment);
             DB::commit();
             return back()->with('success', "Đã từ chối phiếu PDF {$pdfPurchaseRequest->pia_code} thành công.");
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Reject Error for PDF PR {$pdfPurchaseRequest->id}: " . $e->getMessage());
-            return back()->with('error', "Lỗi khi từ chối phiếu PDF {$pdfPurchaseRequest->pia_code}: " . $e->getMessage());
+            return back()->with('error', "Lỗi khi từ chối phiếu PDF: " . $e->getMessage());
         }
     }
 
@@ -157,21 +152,15 @@ class PdfApprovalController extends Controller
         foreach ($ids as $id) {
             $pdfPurchaseRequest = PdfPurchaseRequest::find($id);
 
-            if (!$pdfPurchaseRequest) {
-                $errors[] = "Phiếu PDF ID {$id} không tồn tại.";
-                $failedCount++;
-                continue;
-            }
-
-            if (!$this->userCanApprovePdf(Auth::user(), $pdfPurchaseRequest)) {
-                $errors[] = "Bạn không có quyền duyệt phiếu PDF ID {$id}.";
+            if (!$pdfPurchaseRequest || !$this->userCanApprovePdf(Auth::user(), $pdfPurchaseRequest)) {
+                $errors[] = "Không có quyền hoặc không tìm thấy phiếu PDF ID {$id}.";
                 $failedCount++;
                 continue;
             }
 
             DB::beginTransaction();
             try {
-                $this->performApproval($pdfPurchaseRequest, 'Duyệt hàng loạt');
+                $this->performApprovalLogic($pdfPurchaseRequest, 'Duyệt hàng loạt');
                 DB::commit();
                 $approvedCount++;
             } catch (\Exception $e) {
@@ -182,52 +171,14 @@ class PdfApprovalController extends Controller
             }
         }
 
-        if ($approvedCount > 0) {
-            return back()->with('success', "Đã duyệt thành công {$approvedCount} phiếu PDF.");
-        } else {
-            return back()->with('error', "Không có phiếu PDF nào được duyệt. " . implode(' ', $errors));
+        $message = "Đã duyệt thành công {$approvedCount} phiếu.";
+        if ($failedCount > 0) {
+            $message .= " Thất bại {$failedCount} phiếu.";
         }
+        return back()->with('success', $message);
     }
 
-    public function userCanApprovePdf($user, $pdfPr): bool
-    {
-        if ($pdfPr->status !== 'pending_approval') {
-            return false;
-        }
-
-        $userAssignments = $user->assignments;
-        $requiredRankLevel = $pdfPr->current_rank_level;
-        $pdfPrBranchId = $pdfPr->requester->mainBranch->id ?? null;
-        $pdfPrSectionId = $pdfPr->requester->sections->first()->id ?? null;
-
-        foreach ($userAssignments as $assignment) {
-            if ($assignment->approvalRank->rank_level === $requiredRankLevel && $assignment->branch_id === $pdfPrBranchId) {
-                if ($assignment->group->name === 'Phòng Đề Nghị') {
-                    if ($requiredRankLevel < 4) {
-                        if ($user->sections->contains($pdfPrSectionId)) {
-                            return true;
-                        }
-                    } elseif ($requiredRankLevel === 4) {
-                        if ($pdfPr->requires_director_approval) {
-                            return true;
-                        }
-                    }
-                } elseif ($assignment->group->name === 'Phòng Mua') {
-                    if ($requiredRankLevel === 2) {
-                        return true;
-                    }
-                    if ($requiredRankLevel === 3) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    // File: app/Http/Controllers/Customer/PdfApprovalController.php
-
-    private function performApproval($model, $comment = null)
+    private function performApprovalLogic(PdfPurchaseRequest $model, $comment = null)
     {
         $user = Auth::user();
         $user->load('assignments.group', 'assignments.approvalRank');
@@ -258,147 +209,101 @@ class PdfApprovalController extends Controller
             ->latest('created_at')
             ->first();
 
-        $lastPosition = $lastSignedHistory ? $lastSignedHistory->signature_position : null;
-        // Lấy tọa độ x của chữ ký gần nhất
-        $currentX = $lastPosition ? ($lastPosition['x'] ?? $x) : $x;
-
-        // Tính toán tọa độ x mới cho chữ ký hiện tại
-        $offsetX = ($lastPosition['width'] ?? $width) + 12; // Lấy chiều rộng của chữ ký trước đó + khoảng cách
+$lastPosition = $lastSignedHistory ? $lastSignedHistory->signature_position : null;
+        $currentX = $lastPosition['x'] ?? $x;
+        $offsetX = ($lastPosition['width'] ?? $width) + 12;
         $nextX = $currentX + $offsetX;
+        $now = now()->format('H:i:s d/m/Y ');
 
-        $now = now()->format('H:i:s d/m/Y '); // Lấy thời gian hiện tại
+        $pdf = new Fpdi();
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+        $pageCount = $pdf->setSourceFile($currentPdfPath);
 
-        DB::beginTransaction();
-        try {
-            $pdf = new Fpdi();
-            $pdf->setPrintHeader(false);
-            $pdf->setPrintFooter(false);
-            $pdf->SetDrawColor(255, 255, 255);
-            $pdf->SetLineWidth(0);
-            $pdf->SetCellPaddings(0, 0, 0, 0);
+        if ($page > $pageCount) {
+            throw new \Exception("Trang ký ({$page}) vượt quá số trang của PDF gốc ({$pageCount}).");
+        }
 
-            $pageCount = $pdf->setSourceFile($currentPdfPath);
+        for ($i = 1; $i <= $pageCount; $i++) {
+            $tplId = $pdf->importPage($i);
+            $size = $pdf->getTemplateSize($tplId);
+            $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+            $pdf->useTemplate($tplId);
 
-            if ($page > $pageCount) {
-                throw new \Exception("Trang ký ({$page}) vượt quá số trang của PDF gốc ({$pageCount}).");
-            }
+            if ($i == $page) {
+                $pdf->Image($userSignaturePath, $nextX, $y, $width, $height, '', '', '', false, 300, '', false, false, false);
+                $pdf->SetFont('helvetica', '', 7);
+                $pdf->SetTextColor(0, 0, 0);
+                $textY_time = $y + $height + 4;
+                $pdf->Text($nextX, $textY_time, $now);
 
-            for ($i = 1; $i <= $pageCount; $i++) {
-                $tplId = $pdf->importPage($i);
-                $size = $pdf->getTemplateSize($tplId);
-                $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
-                $pdf->useTemplate($tplId);
-
-                if ($i == $page) {
-                    // In ảnh chữ ký của người phê duyệt hiện tại
-                    $pdf->Image($userSignaturePath, $nextX, $y, $width, $height, '', '', '', false, 300, '', false, false, false);
-
-                    // In thời gian cho chữ ký hiện tại
-                    $pdf->SetFont('helvetica', '', 7);
-                    $pdf->SetTextColor(0, 0, 0);
-                    $textY_time = $y + $height + 4;
-                    $pdf->Text($nextX, $textY_time, $now);
-
-                    // Xử lý trường hợp chữ ký duplicate
-                    if ($currentRankLevel == 3 && !$model->requires_director_approval) {
-                        // Tính toán vị trí X mới cho chữ ký duplicate
-                        $nextX_duplicate = $nextX + $offsetX;
-
-                        // In chữ ký duplicate
-                        $pdf->Image($userSignaturePath, $nextX_duplicate, $y, $width, $height, '', '', '', false, 300, '', false, false, false);
-
-                        // In thời gian cho chữ ký duplicate
-                        $pdf->Text($nextX_duplicate, $textY_time, $now);
-
-                        // Cập nhật lại vị trí X cuối cùng để các chữ ký tiếp theo được đặt đúng
-                        $nextX = $nextX_duplicate;
-                    }
+                if ($currentRankLevel == 3 && !$model->requires_director_approval) {
+                    $nextX_duplicate = $nextX + $offsetX;
+                    $pdf->Image($userSignaturePath, $nextX_duplicate, $y, $width, $height, '', '', '', false, 300, '', false, false, false);
+                    $pdf->Text($nextX_duplicate, $textY_time, $now);
+                    $nextX = $nextX_duplicate;
                 }
             }
+        }
 
-            $signedPdfFileName = 'PR_Signed_' . $model->pia_code . '_' . time() . '.pdf';
-            $signedPdfPath = 'pr_pdfs/signed/' . $signedPdfFileName;
-            $outputFilePath = Storage::disk('public')->path($signedPdfPath);
-            Storage::disk('public')->makeDirectory('pr_pdfs/signed');
-            $pdf->Output($outputFilePath, 'F');
+        $signedPdfFileName = 'PR_Signed_' . $model->pia_code . '_' . time() . '.pdf';
+        $signedPdfPath = 'pr_pdfs/signed/' . $signedPdfFileName;
+        $outputFilePath = Storage::disk('public')->path($signedPdfPath);
+        Storage::disk('public')->makeDirectory('pr_pdfs/signed');
+        $pdf->Output($outputFilePath, 'F');
 
-            if ($model->signed_pdf_path && Storage::disk('public')->exists($model->signed_pdf_path)) {
-                Storage::disk('public')->delete($model->signed_pdf_path);
+        if ($model->signed_pdf_path && Storage::disk('public')->exists($model->signed_pdf_path)) {
+            Storage::disk('public')->delete($model->signed_pdf_path);
+        }
+
+        $rankAtApproval = 'Unknown';
+        foreach ($user->assignments as $assignment) {
+            if ($assignment->approvalRank->rank_level === $currentRankLevel) {
+                $rankAtApproval = $assignment->group->name . ' Cấp ' . $assignment->approvalRank->rank_level;
+                break;
             }
+        }
 
-            $rankAtApproval = 'Unknown';
-            foreach ($user->assignments as $assignment) {
-                if ($assignment->approvalRank->rank_level === $currentRankLevel) {
-                    $rankAtApproval = $assignment->group->name . ' Cấp ' . $assignment->approvalRank->rank_level;
-                    break;
-                }
-            }
+        $signaturePositionData = json_encode([
+            'x' => $nextX, 'y' => $y, 'width' => $width, 'height' => $height, 'page' => $page,
+        ]);
 
-            $signaturePositionData = [
-                'x' => $nextX,
-                'y' => $y,
-                'width' => $width,
-                'height' => $height,
-                'page' => $page,
-            ];
+        ApprovalHistory::create([
+            'pdf_purchase_request_id' => $model->id,
+            'user_id' => $user->id,
+            'rank_at_approval' => $rankAtApproval,
+            'action' => 'approved',
+            'signature_image_path' => $user->signature_image_path ?? 'no-signature.png',
+            'comment' => $comment,
+            'signature_position' => $signaturePositionData,
+        ]);
 
-            // Sửa lỗi: signature_position cần được lưu dưới dạng chuỗi JSON
-            $jsonSignaturePosition = json_encode($signaturePositionData);
-
-            ApprovalHistory::create([
-                'purchase_request_id' => null,
-                'pdf_purchase_request_id' => $model->id,
-                'user_id' => $user->id,
-                'rank_at_approval' => $rankAtApproval,
-                'action' => 'approved',
-                'signature_image_path' => $user->signature_image_path ?? 'no-signature.png',
-                'comment' => $comment,
-                'signature_position' => $jsonSignaturePosition,
-            ]);
-
-            if ($currentRankLevel == 3) {
-                if ($model->requires_director_approval) {
-                    $model->current_rank_level = 4;
-                } else {
-                    $model->status = 'purchasing_approval';
-                    $model->current_rank_level = 2;
-                }
-            } elseif ($currentRankLevel == 4) {
+        if ($currentRankLevel == 3) {
+            if ($model->requires_director_approval) {
+                $model->current_rank_level = 4;
+            } else {
                 $model->status = 'purchasing_approval';
                 $model->current_rank_level = 2;
-            } else {
-                $model->current_rank_level++;
             }
+        } elseif ($currentRankLevel == 4) {
+            $model->status = 'purchasing_approval';
+            $model->current_rank_level = 2;
+        } else {
+            $model->current_rank_level++;
+        }
 
-            // Cập nhật vị trí chữ ký mới nhất vào model để sử dụng cho lần duyệt tiếp theo
-            $model->signature_pos_x = $nextX; // Sử dụng tọa độ x mới
-            $model->signature_pos_y = $y;
-            $model->signature_width = $width;
-            $model->signature_height = $height;
-            $model->signature_page = $page;
-            $model->signed_pdf_path = $signedPdfPath;
-            $model->save();
+        $model->signed_pdf_path = $signedPdfPath;
+        $model->save();
 
-            DB::commit();
-
-            // Gửi email thông báo cho người duyệt tiếp theo
-            $nextApprovers = $this->findNextApproversForPdfPurchaseRequest($model);
-            if ($nextApprovers->isNotEmpty()) {
-                foreach ($nextApprovers as $approver) {
-                    if ($approver->email) {
-                        \Mail::to($approver->email)->queue(new \App\Mail\PurchaseRequestNotification($model));
-                    }
-                }
+        $nextApprovers = $this->findNextApproversForPdfPurchaseRequest($model);
+        if ($nextApprovers->isNotEmpty()) {
+            foreach ($nextApprovers as $approver) {
+                SendPdfApprovalNotification::dispatch($model, $approver);
             }
-            Log::info('DEBUG: Approval notification dispatched for ' . class_basename($model) . ' ' . $model->pia_code . '.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Perform Approval Error for PDF PR {$model->id}: " . $e->getMessage());
-            throw $e;
         }
     }
 
-    private function performRejection($model, $comment)
+    private function performRejectionLogic(PdfPurchaseRequest $model, $comment)
     {
         $user = Auth::user();
         $user->load('assignments.group', 'assignments.approvalRank');
@@ -417,21 +322,51 @@ class PdfApprovalController extends Controller
         $model->save();
 
         ApprovalHistory::create([
-            'purchase_request_id' => null,
             'pdf_purchase_request_id' => $model->id,
             'user_id' => $user->id,
             'rank_at_approval' => $rankAtApproval,
             'action' => 'rejected',
             'signature_image_path' => $user->signature_image_path ?? 'no-signature.png',
             'comment' => $comment,
-            'signature_position' => null,
         ]);
-          // Gửi email thông báo cho người tạo khi phiếu bị từ chối
+
         $requester = $model->requester;
-        if ($requester && $requester->email) {
-            \Mail::to($requester->email)->queue(new \App\Mail\PurchaseRequestNotification($model));
+        if ($requester) {
+            SendPdfApprovalNotification::dispatch($model, $requester);
         }
-        Log::info('DEBUG: Rejection notification WOULD BE dispatched for ' . class_basename($model) . ' ' . $model->pia_code . '. (Email functionality removed)');
+    }
+
+    public function userCanApprovePdf($user, $pdfPr): bool
+    {
+        if ($pdfPr->status !== 'pending_approval') {
+            return false;
+        }
+
+        $userAssignments = $user->assignments;
+        $requiredRankLevel = $pdfPr->current_rank_level;
+        $pdfPrBranchId = $pdfPr->requester->mainBranch->id ?? null;
+        $pdfPrSectionId = $pdfPr->requester->sections->first()->id ?? null;
+
+        foreach ($userAssignments as $assignment) {
+            if ($assignment->approvalRank->rank_level === $requiredRankLevel && $assignment->branch_id === $pdfPrBranchId) {
+                if ($assignment->group->name === 'Phòng Đề Nghị') {
+                    if ($requiredRankLevel < 4) {
+                        if ($user->sections->contains($pdfPrSectionId)) {
+                            return true;
+                        }
+                    } elseif ($requiredRankLevel === 4) {
+                        if ($pdfPr->requires_director_approval) {
+                            return true;
+                        }
+                    }
+                } elseif ($assignment->group->name === 'Phòng Mua') {
+                    if (in_array($requiredRankLevel, [2, 3])) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public function findNextApproversForPdfPurchaseRequest(PdfPurchaseRequest $pdfPr): Collection
@@ -443,13 +378,15 @@ class PdfApprovalController extends Controller
         $nextRankLevel = $pdfPr->current_rank_level;
         $branchId = $pdfPr->requester->mainBranch->id ?? null;
         $sectionId = $pdfPr->requester->sections->first()->id ?? null;
-
         $isRequestingStage = $pdfPr->status === 'pending_approval';
-        $groupName = 'Phòng Đề Nghị';
+        $groupName = $isRequestingStage ? 'Phòng Đề Nghị' : 'Phòng Mua';
         $targetGroupId = Group::where('name', $groupName)->value('id');
 
-        if (!$targetGroupId || !$branchId || !$sectionId) {
-            Log::warning("DEBUG: findNextApproversForPdfPurchaseRequest: Không tìm thấy Group, Branch, hoặc Section ID cho PDF PR {$pdfPr->id}. Branch: {$branchId}, Section: {$sectionId}, Group: {$targetGroupId}");
+        if (!$targetGroupId || !$branchId) {
+            return collect();
+        }
+
+        if ($isRequestingStage && !$sectionId) {
             return collect();
         }
 
@@ -460,17 +397,12 @@ class PdfApprovalController extends Controller
                     ->where('group_id', $targetGroupId);
             });
 
-        if ($isRequestingStage && $nextRankLevel < 4) {
+        if ($isRequestingStage) {
             $approverQuery->whereHas('sections', fn($q) => $q->where('sections.id', $sectionId));
-        } elseif ($isRequestingStage && $nextRankLevel === 4) {
-            $approverQuery->whereHas('assignments', function ($q) use ($nextRankLevel, $branchId) {
-                $q->whereHas('approvalRank', fn($r) => $r->where('rank_level', 4))
-                    ->where('branch_id', $branchId)
-                    ->where('group_id', Group::where('name', 'Phòng Đề Nghị')->value('id'));
-            });
-            if (!$pdfPr->requires_director_approval) {
-                return collect();
-            }
+        }
+
+        if ($isRequestingStage && $nextRankLevel === 4 && !$pdfPr->requires_director_approval) {
+            return collect();
         }
 
         return $approverQuery->get();
