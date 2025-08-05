@@ -90,7 +90,7 @@
                 // Ngôn ngữ gốc của trang web của bạn
                 pageLanguage: 'vi',
                 // Chỉ định các ngôn ngữ bạn muốn hiển thị trong danh sách
-                includedLanguages: 'en,ja,ko,zh-CN,fr',
+                includedLanguages: 'en,ja',
                 // Giao diện: ngang, dọc, hoặc chỉ có icon
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
                 // Tự động ẩn banner của Google sau khi dịch

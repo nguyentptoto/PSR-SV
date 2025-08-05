@@ -23,9 +23,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Imports\PurchaseRequestsImport;
 use ZipArchive;
-use App\Models\PdfPurchaseRequest; // Import the new PDF model
-use setasign\Fpdi\Tcpdf\Fpdi; // Import FPDI with TCPDF
-use Symfony\Component\HttpFoundation\StreamedResponse; // Import
+
 
 class PurchaseRequestController extends Controller
 {
@@ -301,7 +299,7 @@ class PurchaseRequestController extends Controller
         return Excel::download(new PurchaseRequestExport($purchaseRequest), $fileName);
     }
 
-     public function exportPdf(PurchaseRequest $purchaseRequest)
+    public function exportPdf(PurchaseRequest $purchaseRequest)
     {
         $purchaseRequest->load('requester', 'branch', 'executingDepartment', 'items', 'approvalHistories.user');
         $fileName = 'PR-' . $purchaseRequest->pia_code . '.pdf';

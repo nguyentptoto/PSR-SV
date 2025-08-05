@@ -14,54 +14,54 @@ class PurchaseRequestNotification extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    // Giữ lại một thuộc tính duy nhất để truyền model vào
-    public Model $requestModel;
+    public $purchaseRequest;
+    public $pdfPurchaseRequest;
+    public $requestType;
+    public $requesterName;
 
-    /**
-     * Create a new message instance.
-     *
-     * @return void
-     */
     public function __construct(Model $requestModel)
     {
-        // CHỈ LƯU MODEL, KHÔNG XỬ LÝ GÌ Ở ĐÂY
-        $this->requestModel = $requestModel;
+        if ($requestModel instanceof PurchaseRequest) {
+            $this->purchaseRequest = $requestModel;
+            $this->requestType = 'Excel';
+        } elseif ($requestModel instanceof PdfPurchaseRequest) {
+            $this->pdfPurchaseRequest = $requestModel;
+            $this->requestType = 'PDF';
+        }
     }
 
-    /**
-     * Build the message.
-     *
-     * @return $this
-     */
     public function build()
     {
-        // BẮT BUỘC: Tải relationship tại đây, trước khi sử dụng
-        $this->requestModel->load('requester');
-
-        $purchaseRequest = null;
-        $pdfPurchaseRequest = null;
-        $requesterName = $this->requestModel->requester->name ?? 'N/A';
-        $requestType = '';
-        $piaCode = $this->requestModel->pia_code;
-
-        // Xử lý logic và gán thuộc tính ở đây
-        if ($this->requestModel instanceof PurchaseRequest) {
-            $purchaseRequest = $this->requestModel;
-            $requestType = 'Excel';
-        } elseif ($this->requestModel instanceof PdfPurchaseRequest) {
-            $pdfPurchaseRequest = $this->requestModel;
-            $requestType = 'PDF';
+        if ($this->purchaseRequest) {
+            $this->purchaseRequest->load('requester');
+            $this->requesterName = $this->purchaseRequest->requester->name ?? 'N/A';
+            $piaCode = $this->purchaseRequest->pia_code;
+            $viewName = 'emails.purchase_request_notification'; // Tên file view cho phiếu Excel
+        } elseif ($this->pdfPurchaseRequest) {
+            $this->pdfPurchaseRequest->load('requester');
+            $this->requesterName = $this->pdfPurchaseRequest->requester->name ?? 'N/A';
+            $piaCode = $this->pdfPurchaseRequest->pia_code;
+            $viewName = 'emails.purchase_request_notification_pdf'; // Tên file view cho phiếu PDF
+        } else {
+            $this->requesterName = 'N/A';
+            $piaCode = 'N/A';
+            $viewName = 'emails.purchase_request_notification_generic'; // View mặc định cho các trường hợp khác
         }
 
-        $subject = "Thông báo: Có phiếu đề nghị mua hàng cần xử lý ({$requestType} - {$piaCode})";
+        $subject = "Thông báo: Có phiếu đề nghị mua hàng cần xử lý ({$this->requestType} - {$piaCode})";
 
         return $this->subject($subject)
-            ->markdown('emails.purchase_request_notification')
+            ->markdown($viewName) // Dùng biến $viewName để chọn view
             ->with([
-                'requesterName' => $requesterName,
-                'requestType' => $requestType,
-                'purchaseRequest' => $purchaseRequest, // có thể null
-                'pdfPurchaseRequest' => $pdfPurchaseRequest, // có thể null
+                'purchaseRequest' => $this->purchaseRequest,
+                'pdfPurchaseRequest' => $this->pdfPurchaseRequest,
+                'requestType' => $this->requestType,
+                'requesterName' => $this->requesterName,
             ]);
+    }
+
+    public function attachments()
+    {
+        return [];
     }
 }

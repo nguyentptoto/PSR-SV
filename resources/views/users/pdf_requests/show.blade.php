@@ -78,7 +78,7 @@
                                     $statusClass = 'badge badge-info';
                                     break;
                                 case 'purchasing_approval':
-                                    $statusText = 'Đang chờ duyệt mua';
+                                    $statusText = 'Đang chờ phòng mua duyệt';
                                     $statusClass = 'badge badge-primary';
                                     break;
                                 case 'canceled':

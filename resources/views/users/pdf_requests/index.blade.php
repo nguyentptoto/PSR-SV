@@ -14,17 +14,24 @@
                 <div class="row g-3">
                     <div class="col-md-4">
                         <label for="pia_code" class="form-label">Mã Phiếu (PR NO)</label>
-                        <input type="text" class="form-control" id="pia_code" name="pia_code" value="{{ request('pia_code') }}">
+                        <input type="text" class="form-control" id="pia_code" name="pia_code"
+                            value="{{ request('pia_code') }}">
                     </div>
                     <div class="col-md-4">
                         <label for="status" class="form-label">Trạng thái</label>
                         <select class="form-select" id="status" name="status">
                             <option value="">-- Tất cả --</option>
-                            <option value="pending_approval" {{ request('status') == 'pending_approval' ? 'selected' : '' }}>Đang chờ duyệt</option>
-                            <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Đã phê duyệt</option>
-                            <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Đã từ chối</option>
-                            <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Đã hoàn thành</option>
-                            <option value="purchasing_approval" {{ request('status') == 'purchasing_approval' ? 'selected' : '' }}>Đang chờ duyệt mua</option>
+                            <option value="pending_approval"
+                                {{ request('status') == 'pending_approval' ? 'selected' : '' }}>Đang chờ duyệt</option>
+                            <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Đã phê duyệt
+                            </option>
+                            <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Đã từ chối
+                            </option>
+                            <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Đã hoàn thành
+                            </option>
+                            <option value="purchasing_approval"
+                                {{ request('status') == 'purchasing_approval' ? 'selected' : '' }}>Đang chờ phòng mua duyệt
+                            </option>
                             <option value="canceled" {{ request('status') == 'canceled' ? 'selected' : '' }}>Đã hủy</option>
                         </select>
                     </div>
@@ -104,7 +111,7 @@
                                                 break;
                                             case 'purchasing_approval':
                                                 $statusClass = 'badge badge-primary';
-                                                $statusText = 'Đang chờ duyệt mua';
+                                                $statusText = 'Đang chờ phòng mua duyệt';
                                                 break;
                                             case 'canceled':
                                                 $statusClass = 'badge badge-secondary';
@@ -122,36 +129,41 @@
                                 <td>{{ $pdfPr->created_at->format('d/m/Y H:i') }}</td>
                                 <td>
                                     {{-- Nút xem chi tiết (nếu có show method cho PDF PR) --}}
-                                    <a href="{{ route('users.pdf-requests.show', $pdfPr->id) }}" class="btn btn-info btn-sm">
+                                    <a href="{{ route('users.pdf-requests.show', $pdfPr->id) }}"
+                                        class="btn btn-info btn-sm">
                                         <i class="fas fa-eye"></i> Xem
                                     </a>
 
                                     {{-- Nút ký lại (nếu trạng thái cho phép) --}}
                                     @if ($pdfPr->status === 'pending_approval' && $pdfPr->current_rank_level === 1 && $pdfPr->requester_id === Auth::id())
-                                        <a href="{{ route('users.pdf-requests.preview-sign', $pdfPr->id) }}" class="btn btn-warning btn-sm">
+                                        <a href="{{ route('users.pdf-requests.preview-sign', $pdfPr->id) }}"
+                                            class="btn btn-warning btn-sm">
                                             <i class="fas fa-signature"></i> Ký lại
                                         </a>
                                     @elseif ($pdfPr->signed_pdf_path)
                                         {{-- SỬ DỤNG asset() CHO FILE ĐÃ KÝ --}}
-                                        <a href="{{ asset('storage/' . $pdfPr->signed_pdf_path) }}" target="_blank" class="btn btn-secondary btn-sm">
+                                        <a href="{{ asset('storage/' . $pdfPr->signed_pdf_path) }}" target="_blank"
+                                            class="btn btn-secondary btn-sm">
                                             <i class="fas fa-file-pdf"></i> Xem PDF đã ký
                                         </a>
                                     @elseif ($pdfPr->original_pdf_path)
                                         {{-- SỬ DỤNG route() CHO FILE GỐC (vì nó được phục vụ qua Controller) --}}
-                                        <a href="{{ route('users.pdf-requests.view-file', $pdfPr->id) }}" target="_blank" class="btn btn-secondary btn-sm">
+                                        <a href="{{ route('users.pdf-requests.view-file', $pdfPr->id) }}" target="_blank"
+                                            class="btn btn-secondary btn-sm">
                                             <i class="fas fa-file-pdf"></i> Xem PDF gốc
                                         </a>
                                     @endif
 
                                     {{-- Các nút hành động edit và delete cho PDF PR --}}
-                                    @if ($pdfPr->status === 'pending_approval' && $pdfPr->current_rank_level === 1 && $pdfPr->requester_id === Auth::id())
-                                        <a href="{{ route('users.pdf-requests.edit', $pdfPr->id) }}" class="btn btn-primary btn-sm" title="Chỉnh sửa">
-                                            <i class="fas fa-edit"></i>
+                                    @if ($pdfPr->status === 'pending_approval' && $pdfPr->requester_id === Auth::id())
+                                        <a href="{{ route('users.pdf-requests.edit', $pdfPr->id) }}"
+                                            class="btn btn-primary btn-sm" title="Chỉnh sửa">
+                                            Sửa
                                         </a>
                                         <button type="button" class="btn btn-danger btn-sm" title="Xóa"
-                                                data-bs-toggle="modal" data-bs-target="#deletePdfConfirmationModal"
-                                                data-delete-url="{{ route('users.pdf-requests.destroy', $pdfPr->id) }}">
-                                            <i class="fas fa-trash"></i>
+                                            data-bs-toggle="modal" data-bs-target="#deletePdfConfirmationModal"
+                                            data-delete-url="{{ route('users.pdf-requests.destroy', $pdfPr->id) }}">
+                                            Xóa
                                         </button>
                                     @endif
                                 </td>
@@ -180,7 +192,8 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    Bạn có chắc chắn muốn xóa phiếu đề nghị PDF này không? Hành động này không thể hoàn tác và sẽ xóa cả file PDF liên quan.
+                    Bạn có chắc chắn muốn xóa phiếu đề nghị PDF này không? Hành động này không thể hoàn tác và sẽ xóa cả
+                    file PDF liên quan.
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
@@ -197,7 +210,7 @@
 
 @push('scripts')
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             const deletePdfModal = document.getElementById('deletePdfConfirmationModal');
             if (deletePdfModal) {
                 deletePdfModal.addEventListener('show.bs.modal', event => {

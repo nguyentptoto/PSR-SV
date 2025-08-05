@@ -95,4 +95,30 @@ Route::middleware(['auth'])->group(function () {
         // Route resource phải để sau cùng
         Route::resource('users', UserController::class);
     });
+    Route::get('/test-mpdf', function () {
+    // Tạo một thư mục test riêng để không bị nhầm lẫn
+    $tempDir = storage_path('app/mpdf_test');
+
+    // Tạo thư mục nếu nó chưa tồn tại
+    if (!is_dir($tempDir)) {
+        mkdir($tempDir, 0777, true);
+    }
+
+    try {
+        // Khởi tạo MPDF trực tiếp với cấu hình thư mục tạm
+        $mpdf = new \Mpdf\Mpdf([
+            'tempDir' => $tempDir
+        ]);
+
+        // Ghi một nội dung HTML đơn giản có tiếng Việt
+        $mpdf->WriteHTML('<h1>Xin chào thế giới!</h1><p>Đây là file PDF được tạo độc lập để kiểm tra MPDF.</p>');
+
+        // Xuất file PDF ra thẳng trình duyệt
+        return $mpdf->Output('test_mpdf.pdf', 'I');
+
+    } catch (\Exception $e) {
+        // Nếu có bất kỳ lỗi nào xảy ra, nó sẽ hiện ra rõ ràng
+        dd($e->getMessage());
+    }
+});
 });

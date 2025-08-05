@@ -197,6 +197,7 @@ class PdfApprovalController extends Controller
             throw new \Exception("Không tìm thấy ảnh chữ ký của người duyệt.");
         }
 
+        // Lấy thông tin vị trí chữ ký mặc định từ model
         $x = $model->signature_pos_x ?? 85;
         $y = $model->signature_pos_y ?? 50;
         $width = $model->signature_width ?? 15;
@@ -209,15 +210,31 @@ class PdfApprovalController extends Controller
             ->latest('created_at')
             ->first();
 
-$lastPosition = $lastSignedHistory ? $lastSignedHistory->signature_position : null;
-        $currentX = $lastPosition['x'] ?? $x;
+        // Sửa: Giải mã chuỗi JSON một cách an toàn
+ // SỬA LỖI NÀY: KIỂM TRA ĐỂ GIẢI MÃ CHUỖI JSON
+        if ($lastSignedHistory && is_string($lastSignedHistory->signature_position)) {
+             $lastPosition = json_decode($lastSignedHistory->signature_position, true);
+        } else {
+             $lastPosition = $lastSignedHistory->signature_position ?? null;
+        }
+        // Lấy tọa độ x của chữ ký gần nhất
+        $currentX = $lastPosition ? ($lastPosition['x'] ?? $x) : $x;
+
+        // Tính toán tọa độ x mới cho chữ ký hiện tại
         $offsetX = ($lastPosition['width'] ?? $width) + 12;
         $nextX = $currentX + $offsetX;
-        $now = now()->format('H:i:s d/m/Y ');
 
+         $now = now()->format('H:i:s d/m/Y ');
+
+    DB::beginTransaction();
+    try {
         $pdf = new Fpdi();
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
+        $pdf->SetDrawColor(255, 255, 255);
+        $pdf->SetLineWidth(0);
+        $pdf->SetCellPaddings(0, 0, 0, 0);
+
         $pageCount = $pdf->setSourceFile($currentPdfPath);
 
         if ($page > $pageCount) {
@@ -231,12 +248,14 @@ $lastPosition = $lastSignedHistory ? $lastSignedHistory->signature_position : nu
             $pdf->useTemplate($tplId);
 
             if ($i == $page) {
+                // In ảnh chữ ký của người phê duyệt hiện tại
                 $pdf->Image($userSignaturePath, $nextX, $y, $width, $height, '', '', '', false, 300, '', false, false, false);
                 $pdf->SetFont('helvetica', '', 7);
                 $pdf->SetTextColor(0, 0, 0);
                 $textY_time = $y + $height + 4;
                 $pdf->Text($nextX, $textY_time, $now);
 
+                // Xử lý trường hợp chữ ký duplicate
                 if ($currentRankLevel == 3 && !$model->requires_director_approval) {
                     $nextX_duplicate = $nextX + $offsetX;
                     $pdf->Image($userSignaturePath, $nextX_duplicate, $y, $width, $height, '', '', '', false, 300, '', false, false, false);
@@ -246,7 +265,7 @@ $lastPosition = $lastSignedHistory ? $lastSignedHistory->signature_position : nu
             }
         }
 
-        $signedPdfFileName = 'PR_Signed_' . $model->pia_code . '_' . time() . '.pdf';
+        $signedPdfFileName = 'PR_' . $model->pia_code  . '.pdf';
         $signedPdfPath = 'pr_pdfs/signed/' . $signedPdfFileName;
         $outputFilePath = Storage::disk('public')->path($signedPdfPath);
         Storage::disk('public')->makeDirectory('pr_pdfs/signed');
@@ -292,6 +311,11 @@ $lastPosition = $lastSignedHistory ? $lastSignedHistory->signature_position : nu
             $model->current_rank_level++;
         }
 
+        $model->signature_pos_x = $nextX;
+        $model->signature_pos_y = $y;
+        $model->signature_width = $width;
+        $model->signature_height = $height;
+        $model->signature_page = $page;
         $model->signed_pdf_path = $signedPdfPath;
         $model->save();
 
@@ -301,6 +325,15 @@ $lastPosition = $lastSignedHistory ? $lastSignedHistory->signature_position : nu
                 SendPdfApprovalNotification::dispatch($model, $approver);
             }
         }
+
+        DB::commit(); // Sửa: Commit transaction khi thành công
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error("Perform Approval Error for PDF PR {$model->id}: " . $e->getMessage());
+        throw $e;
+    }
+
     }
 
     private function performRejectionLogic(PdfPurchaseRequest $model, $comment)

@@ -24,6 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use App\Jobs\SendPdfApprovalNotification; // Import job for PDF approval notifications
+
 class PdfPurchaseRequestController extends Controller
 {
     public function index(Request $request)
@@ -155,7 +156,7 @@ class PdfPurchaseRequestController extends Controller
     public function edit(PdfPurchaseRequest $pdfPurchaseRequest)
     {
         abort_if($pdfPurchaseRequest->requester_id !== Auth::id(), 403);
-        abort_if($pdfPurchaseRequest->status !== 'pending_approval' || $pdfPurchaseRequest->current_rank_level > 1, 403, 'Phiếu PDF đã được ký hoặc gửi đi duyệt, không thể cập nhật.');
+        abort_if($pdfPurchaseRequest->status !== 'pending_approval' || $pdfPurchaseRequest->current_rank_level > 2, 403, 'Phiếu PDF đã được cấp trên duyệt, không thể cập nhật.');
 
         $user = Auth::user();
         $user->load('sections', 'mainBranch');
@@ -216,21 +217,42 @@ class PdfPurchaseRequestController extends Controller
 
     public function destroy(PdfPurchaseRequest $pdfPurchaseRequest)
     {
-        abort_if($pdfPurchaseRequest->requester_id !== Auth::id(), 403);
-        abort_if($pdfPurchaseRequest->status !== 'pending_approval' || $pdfPurchaseRequest->current_rank_level > 1, 403, 'Phiếu PDF đã được ký hoặc gửi đi duyệt, không thể xóa.');
+        // Chỉ cho phép người tạo phiếu xóa nó
+        abort_if($pdfPurchaseRequest->requester_id !== Auth::id(), 403, 'Bạn không có quyền xóa phiếu PDF này.');
+
+        // Nếu phiếu đã được hoàn thành hoặc đã bị từ chối, không thể xóa
+        // Bạn có thể thêm các trạng thái khác vào đây nếu muốn
+        if ($pdfPurchaseRequest->status === 'completed' || $pdfPurchaseRequest->status === 'rejected') {
+            return back()->with('error', 'Không thể xóa phiếu đã hoàn thành hoặc bị từ chối.');
+        }
 
         DB::beginTransaction();
         try {
-            if ($pdfPurchaseRequest->original_pdf_path) {
+            // Xóa file PDF gốc
+            if ($pdfPurchaseRequest->original_pdf_path && Storage::disk('public')->exists($pdfPurchaseRequest->original_pdf_path)) {
                 Storage::disk('public')->delete($pdfPurchaseRequest->original_pdf_path);
             }
-            if ($pdfPurchaseRequest->signed_pdf_path) {
+
+            // Xóa file PDF đã ký (nếu có)
+            if ($pdfPurchaseRequest->signed_pdf_path && Storage::disk('public')->exists($pdfPurchaseRequest->signed_pdf_path)) {
                 Storage::disk('public')->delete($pdfPurchaseRequest->signed_pdf_path);
             }
 
+
+            if ($pdfPurchaseRequest->attachments) {
+                foreach ($pdfPurchaseRequest->attachments as $attachment) {
+                    if (Storage::disk('public')->exists($attachment->file_path)) {
+                        Storage::disk('public')->delete($attachment->file_path);
+                    }
+                }
+                $pdfPurchaseRequest->attachments()->delete();
+            }
+
             $pdfPurchaseRequest->delete();
+
             DB::commit();
-            return redirect()->route('users.pdf-requests.index')->with('success', 'Phiếu PDF đã được xóa thành công!');
+
+            return redirect()->route('users.pdf-requests.index')->with('success', 'Phiếu PDF và các file liên quan đã được xóa thành công!');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error deleting PDF request {$pdfPurchaseRequest->id}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);

@@ -24,8 +24,8 @@
                     @endphp
 
                     @if (in_array($purchaseRequest->status, ['purchasing_approval', 'completed']))
-                        {{-- <a href="{{ route('users.purchase-requests.export', $purchaseRequest->id) }}"
-                            class="btn btn-success"><i class="bi bi-file-earmark-excel"></i> Export Excel</a> --}}
+                        <a href="{{ route('users.purchase-requests.export', $purchaseRequest->id) }}"
+                            class="btn btn-success"><i class="bi bi-file-earmark-excel"></i> Export Excel</a>
                         <a href="{{ route('users.purchase-requests.export.pdf', $purchaseRequest) }}"
                             class="btn btn-danger">
                             Export to PDF
