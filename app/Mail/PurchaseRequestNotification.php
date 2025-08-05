@@ -3,55 +3,63 @@
 namespace App\Mail;
 
 use App\Models\PurchaseRequest;
+use App\Models\PdfPurchaseRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
-// Không cần dùng Envelope và Content nếu dùng build() truyền thống
-// use Illuminate\Mail\Mailables\Envelope;
-// use Illuminate\Mail\Mailables\Content;
+use Illuminate\Database\Eloquent\Model;
 
-class PurchaseRequestNotification extends Mailable
+class PurchaseRequestNotification extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
     public $purchaseRequest;
+    public $pdfPurchaseRequest;
+    public $requestType;
+    public $requesterName;
 
-    public function __construct(PurchaseRequest $purchaseRequest)
+    public function __construct(Model $requestModel)
     {
-        $this->purchaseRequest = $purchaseRequest;
+        if ($requestModel instanceof PurchaseRequest) {
+            $this->purchaseRequest = $requestModel;
+            $this->requestType = 'Excel';
+        } elseif ($requestModel instanceof PdfPurchaseRequest) {
+            $this->pdfPurchaseRequest = $requestModel;
+            $this->requestType = 'PDF';
+        }
     }
 
-    /**
-     * Build the message.
-     *
-     * @return $this
-     */
     public function build()
     {
-        // 1. TIÊU ĐỀ CHUNG - Không chứa thông tin động
-        // Tiêu đề này sẽ giống hệt nhau cho mọi email.
-        $subject = 'Thông báo: Có phiếu đề nghị mua hàng cần xử lý';
+        if ($this->purchaseRequest) {
+            $this->purchaseRequest->load('requester');
+            $this->requesterName = $this->purchaseRequest->requester->name ?? 'N/A';
+            $piaCode = $this->purchaseRequest->pia_code;
+            $viewName = 'emails.purchase_request_notification'; // Tên file view cho phiếu Excel
+        } elseif ($this->pdfPurchaseRequest) {
+            $this->pdfPurchaseRequest->load('requester');
+            $this->requesterName = $this->pdfPurchaseRequest->requester->name ?? 'N/A';
+            $piaCode = $this->pdfPurchaseRequest->pia_code;
+            $viewName = 'emails.purchase_request_notification_pdf'; // Tên file view cho phiếu PDF
+        } else {
+            $this->requesterName = 'N/A';
+            $piaCode = 'N/A';
+            $viewName = 'emails.purchase_request_notification_generic'; // View mặc định cho các trường hợp khác
+        }
 
-        // 2. ID THAM CHIẾU CHUNG - Một chuỗi cố định
-        // ID này cũng giống hệt nhau cho mọi email.
-        $domain = parse_url(config('app.url'), PHP_URL_HOST);
-        $threadId = "<purchase-request-notifications@{$domain}>";
+        $subject = "Thông báo: Có phiếu đề nghị mua hàng cần xử lý ({$this->requestType} - {$piaCode})";
 
         return $this->subject($subject)
-            ->markdown('emails.purchase_request_notification')
-            ->withSwiftMessage(function ($message) use ($threadId) {
-                // 3. THIẾT LẬP HEADER
-                // Vì subject và threadId luôn giống nhau, các hòm thư sẽ gom tất cả vào một chỗ.
-                $message->getHeaders()->addTextHeader('References', $threadId);
-            });
+            ->markdown($viewName) // Dùng biến $viewName để chọn view
+            ->with([
+                'purchaseRequest' => $this->purchaseRequest,
+                'pdfPurchaseRequest' => $this->pdfPurchaseRequest,
+                'requestType' => $this->requestType,
+                'requesterName' => $this->requesterName,
+            ]);
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array
-     */
     public function attachments()
     {
         return [];

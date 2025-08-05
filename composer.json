@@ -17,7 +17,9 @@
         "laravel/sanctum": "^2.11",
         "laravel/tinker": "^2.5",
         "maatwebsite/excel": "^3.1",
-        "mpdf/mpdf": "^8.2"
+        "mpdf/mpdf": "^8.2",
+        "setasign/fpdi": "^2.6",
+        "tecnick.com/tcpdf": "^6.10"
     },
     "require-dev": {
         "facade/ignition": "^2.5",

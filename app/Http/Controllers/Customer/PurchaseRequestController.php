@@ -75,6 +75,10 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
+<<<<<<< HEAD
+=======
+            'items.*.purchase_group' => 'nullable|string|max:20', // This column was removed from DB, but still in validation
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
 
         ]);
 
@@ -144,9 +148,12 @@ class PurchaseRequestController extends Controller
 
             DB::commit();
 
+            // ... bên trong hàm store()
             $nextApprovers = $this->findNextApprovers($purchaseRequest);
             if ($nextApprovers->isNotEmpty()) {
-                SendApprovalNotification::dispatch($purchaseRequest, $nextApprovers);
+                foreach ($nextApprovers as $approver) {
+                    SendApprovalNotification::dispatch($purchaseRequest, $approver);
+                }
             }
 
             return redirect()->route('users.purchase-requests.index')->with('success', 'Tạo phiếu đề nghị thành công!');
@@ -211,6 +218,10 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
+<<<<<<< HEAD
+=======
+            'items.*.purchase_group' => 'nullable|string|max:20',
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
 
         ]);
 
@@ -336,7 +347,7 @@ class PurchaseRequestController extends Controller
         return $approverQuery->get();
     }
 
-     public function importPreview(Request $request)
+    public function importPreview(Request $request)
     {
         // GHI CÁC THÔNG TIN REQUEST VÀO LOG ĐỂ DEBUG
         Log::info('--- Bắt đầu Debug ImportPreview Request ---');
@@ -385,7 +396,11 @@ class PurchaseRequestController extends Controller
             // Lưu cả đường dẫn thư mục tạm cho việc cleanup sau này
             $sessionData = [
                 'purchase_requests' => $importedData,
+<<<<<<< HEAD
                  'temp_attachments_dir' => null // Set to null as no ZIP is processed
+=======
+                'temp_attachments_dir' => null // Set to null as no ZIP is processed
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
             ];
             $request->session()->put('imported_purchase_requests_' . $sessionId, $sessionData);
 
@@ -415,7 +430,7 @@ class PurchaseRequestController extends Controller
         }
     }
 
-     public function showImportPreview(Request $request)
+    public function showImportPreview(Request $request)
     {
         $sessionId = $request->query('session_id');
         $sessionData = $request->session()->get('imported_purchase_requests_' . $sessionId);
@@ -436,7 +451,7 @@ class PurchaseRequestController extends Controller
         return view('users.purchase_requests.import_preview', compact('importedPurchaseRequests', 'executingDepartments', 'user', 'sessionId', 'tempAttachmentsDir'));
     }
 
-     public function createFromImport(Request $request)
+    public function createFromImport(Request $request)
     {
         Log::info('--- Bắt đầu Debug createFromImport Request ---');
         Log::info('Timestamp start: ' . microtime(true));
@@ -487,7 +502,11 @@ class PurchaseRequestController extends Controller
             if (isset($uploadedAttachments[$prIndex]) && $uploadedAttachments[$prIndex] instanceof \Illuminate\Http\UploadedFile) {
                 $individualUploadedFile = $uploadedAttachments[$prIndex];
             } else if (isset($uploadedAttachments[$prIndex]['attachment_file']) && $uploadedAttachments[$prIndex]['attachment_file'] instanceof \Illuminate\Http\UploadedFile) {
+<<<<<<< HEAD
                  $individualUploadedFile = $uploadedAttachments[$prIndex]['attachment_file'];
+=======
+                $individualUploadedFile = $uploadedAttachments[$prIndex]['attachment_file'];
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
             }
 
             // Validate file upload thủ công
@@ -540,7 +559,11 @@ class PurchaseRequestController extends Controller
             $finalPrData['requester_id'] = $requester->id;
             $finalPrData['branch_id'] = $branch->id;
             $finalPrData['section_id'] = $section->id;
+<<<<<<< HEAD
             $finalPrData['requires_director_approval'] = (bool)($finalPrData['requires_director_approval'] ?? false);
+=======
+            $finalPrData['requires_director_approval'] = (bool) ($finalPrData['requires_director_approval'] ?? false);
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
 
             DB::beginTransaction();
             try {
@@ -559,8 +582,12 @@ class PurchaseRequestController extends Controller
                     $newFileName = $purchaseRequest->pia_code . '_' . time() . '.' . $extension; // Đổi tên file
                     $finalAttachmentPath = $individualUploadedFile->storeAs('pr_attachments', $newFileName, 'public');
                     Log::info('DEBUG: Individual file stored at: ' . $finalAttachmentPath . '. Timestamp: ' . microtime(true));
+<<<<<<< HEAD
                 }
                 else {
+=======
+                } else {
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
                     Log::info('DEBUG: No attachment found or uploaded for PR: ' . $purchaseRequest->pia_code);
                 }
 
@@ -587,10 +614,20 @@ class PurchaseRequestController extends Controller
                 $successfulPiaCodes[] = $finalPrData['pia_code'];
 
                 Log::info('DEBUG: Before sending notification for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+<<<<<<< HEAD
                 $nextApprovers = $this->findNextApprovers($purchaseRequest);
                 if ($nextApprovers->isNotEmpty()) {
                     SendApprovalNotification::dispatch($purchaseRequest, $nextApprovers);
                     Log::info('DEBUG: Notification dispatched for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+=======
+                // ... bên trong hàm createFromImport(), trong vòng lặp foreach
+                $nextApprovers = $this->findNextApprovers($purchaseRequest);
+                if ($nextApprovers->isNotEmpty()) {
+                    foreach ($nextApprovers as $approver) {
+                        SendApprovalNotification::dispatch($purchaseRequest, $approver);
+                    }
+                    Log::info('DEBUG: Notification jobs dispatched for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
                 } else {
                     Log::info('DEBUG: No next approvers found for PR: ' . $purchaseRequest->id . '. No notification dispatched.');
                 }
@@ -604,6 +641,7 @@ class PurchaseRequestController extends Controller
         }
 
         Log::info('DEBUG: All PRs processed. Starting cleanup. Timestamp: ' . microtime(true));
+<<<<<<< HEAD
         // Không còn thư mục tạm từ ZIP để xóa
         // if ($originalTempAttachmentsDir && Storage::disk('local')->exists($originalTempAttachmentsDir)) {
         //     Storage::disk('local')->deleteDirectory($originalTempAttachmentsDir);
@@ -611,6 +649,8 @@ class PurchaseRequestController extends Controller
         // } else {
         //     Log::info('DEBUG: No temporary attachment directory to clean up or path is null.');
         // }
+=======
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
         $request->session()->forget('imported_purchase_requests_' . $sessionId);
         Log::info('DEBUG: Session data forgotten. Timestamp: ' . microtime(true));
 
@@ -667,4 +707,19 @@ class PurchaseRequestController extends Controller
         // Tải file ZIP về cho người dùng và tự động xóa sau khi tải xong
         return response()->download($tempZipPath, $zipFileName)->deleteFileAfterSend(true);
     }
+
+
+    private function storeFile($file, $piaCode)
+    {
+        Log::info("DEBUG: Bắt đầu lưu file: {$file->getClientOriginalName()} cho PR: {$piaCode}");
+        $extension = $file->getClientOriginalExtension();
+        $newFileName = $piaCode . '_' . time() . '.' . $extension;
+        $finalPath = $file->storeAs('pr_attachments', $newFileName, 'public'); // Lưu vào thư mục public disk
+        Log::info("DEBUG: File đã lưu vào: {$finalPath}");
+        return $finalPath;
+    }
+
+
+
+
 }

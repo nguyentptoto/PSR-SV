@@ -5,7 +5,7 @@
 
 <body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
 
-     <div class="cursor-dot"></div>
+    <div class="cursor-dot"></div>
     <div class="cursor-outline"></div>
     <div class="app-wrapper">
         <nav class="app-header navbar navbar-expand bg-body">
@@ -14,16 +14,18 @@
                 <ul class="navbar-nav">
                     <li class="nav-item"> <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button"> <i
                                 class="bi bi-list"></i> </a> </li>
-                    <li class="nav-item d-none d-md-block"> <a href="#" style="font-size: 24px;display: flex;justify-content: center;align-items: center;" class="nav-link">Hệ thống phê duyệt mua hàng</a> </li>
+                    <li class="nav-item d-none d-md-block"> <a href="#"
+                            style="font-size: 24px;display: flex;justify-content: center;align-items: center;"
+                            class="nav-link">Hệ thống phê duyệt mua hàng</a> </li>
 
                 </ul>
 
                 <ul class="navbar-nav ms-auto">
 
                     {{-- Thêm đoạn này để chứa thanh dịch --}}
-<li class="nav-item d-flex align-items-center me-2">
-    <div id="google_translate_element"></div>
-</li>
+                    <li class="nav-item d-flex align-items-center me-2">
+                        <div id="google_translate_element"></div>
+                    </li>
                     <li class="nav-item dropdown user-menu">
                         <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
                             {{ Auth::user()->name }}
@@ -83,6 +85,7 @@
     @include('script')
     @include('admin._partials.toast')
     <script type="text/javascript">
+<<<<<<< HEAD
     function googleTranslateElementInit() {
     new google.translate.TranslateElement({
         // Ngôn ngữ gốc của trang web của bạn
@@ -95,9 +98,24 @@
         autoDisplay: false
     }, 'google_translate_element');
     }
+=======
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                // Ngôn ngữ gốc của trang web của bạn
+                pageLanguage: 'vi',
+                // Chỉ định các ngôn ngữ bạn muốn hiển thị trong danh sách
+                includedLanguages: 'en,ja',
+                // Giao diện: ngang, dọc, hoặc chỉ có icon
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                // Tự động ẩn banner của Google sau khi dịch
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
     </script>
 
-<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit">
+    </script>
 </body>
 
 </html>

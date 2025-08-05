@@ -52,7 +52,11 @@
                     <input type="text" name="pia_code" class="form-control" value="{{ old('pia_code') }}" required>
                 </div>
                 <div class="col-md-3 form-group">
+<<<<<<< HEAD
                     <label for="section_id">Phòng của bạn*</label>
+=======
+                    <label for="section_id">Phòng ban của bạn*</label>
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
                     <select name="section_id" class="form-control" required>
                         @foreach ($user->sections as $section)
                             <option value="{{ $section->id }}" {{ old('section_id', $user->sections->first()->id) == $section->id ? 'selected' : '' }}>
@@ -62,7 +66,11 @@
                     </select>
                 </div>
                 <div class="col-md-3 form-group">
+<<<<<<< HEAD
                     <label for="executing_department_id">Cost Center phòng yêu cầu *</label>
+=======
+                    <label for="executing_department_id">Phòng ban yêu cầu*</label>
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
                     <select name="executing_department_id" id="executing-department-select" class="form-control" required style="width: 100%;">
                         <option value="">-- Chọn phòng ban --</option>
                         @foreach ($executingDepartments as $department)

@@ -102,7 +102,7 @@ class PurchaseRequestExport implements WithEvents, WithDrawings
         $sheet->getColumnDimension('M')->setWidth(12);
         $sheet->getColumnDimension('N')->setWidth(12);
         $sheet->getColumnDimension('O')->setWidth(12);
-        $sheet->getParent()->getDefaultStyle()->getFont()->setName('DejaVu Sans')->setSize(10);
+    $sheet->getParent()->getDefaultStyle()->getFont()->setName('DejaVu Sans')->setSize(10);
     }
 
     private function drawPageHeader(Worksheet $sheet, int $startRow): void

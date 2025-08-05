@@ -19,8 +19,7 @@ use Illuminate\Validation\Rules;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
 use App\Exports\UsersExport;
-
-
+use Illuminate\Support\Collection;
 use ZipArchive;
 use Maatwebsite\Excel\Validators\ValidationException;
 
@@ -30,8 +29,6 @@ class UserController extends Controller
     {
         $this->authorizeResource(User::class, 'user');
     }
-
-    // ---- CÁC HÀM XỬ LÝ CRUD ----
 
     public function index(Request $request)
     {
@@ -86,6 +83,7 @@ class UserController extends Controller
         $fileName = 'danh-sach-nguoi-dung-' . now()->format('Y-m-d') . '.xlsx';
         return Excel::download(new UsersExport($usersToExport), $fileName);
     }
+
     public function create()
     {
         $branches = Branch::all();
@@ -93,7 +91,8 @@ class UserController extends Controller
         $groups = Group::all();
         $ranks = ApprovalRank::where('rank_level', '>', 0)->get();
         $jobTitles = JobTitle::all();
-        return view('admin.users.create', compact('branches', 'sections', 'groups', 'ranks', 'jobTitles'));
+        $managers = User::whereHas('assignments.approvalRank', fn($q) => $q->where('rank_level', '>=', 2))->orderBy('name')->get();
+        return view('admin.users.create', compact('branches', 'sections', 'groups', 'ranks', 'jobTitles', 'managers'));
     }
 
     public function store(Request $request)
@@ -105,6 +104,7 @@ class UserController extends Controller
             'prs_id' => 'nullable|string|max:50|unique:users,prs_id',
             'job_title_id' => 'required|exists:job_titles,id',
             'main_branch_id' => 'required|exists:branches,id',
+            'manager_id' => 'nullable|exists:users,id',
             'status' => 'required|boolean',
             'signature_image' => 'nullable|image|mimes:png,jpg,jpeg|max:1024',
             'sections' => 'required|array',
@@ -115,17 +115,14 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
-            $createData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id']);
+            $createData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id', 'manager_id']);
             $createData['password'] = Hash::make('12345678');
 
-            // ✅ SỬA ĐỔI: Lưu ảnh chữ ký với tên là mã nhân viên
             if ($request->hasFile('signature_image')) {
                 $imageFile = $request->file('signature_image');
                 $employeeId = $validated['employee_id'];
                 $extension = $imageFile->getClientOriginalExtension();
                 $newFileName = $employeeId . '.' . $extension;
-
-                // Dùng storeAs để lưu với tên tùy chỉnh
                 $path = $imageFile->storeAs('signatures', $newFileName, 'public');
                 $createData['signature_image_path'] = $path;
             }
@@ -133,7 +130,6 @@ class UserController extends Controller
             $user = User::create($createData);
             $user->sections()->attach($validated['sections']);
 
-            // Xử lý assignments
             if (!empty($validated['assignments'])) {
                 foreach ($validated['assignments'] as $group_id => $approval_rank_id) {
                     if (!empty($approval_rank_id)) {
@@ -150,12 +146,13 @@ class UserController extends Controller
             return redirect()->route('admin.users.index')->with('success', 'Tạo người dùng thành công.');
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Lỗi tạo người dùng: ' . $e->getMessage());
+            Log::error('Lỗi tạo người dùng: ' . $e->getMessage());
             return back()->with('error', 'Đã xảy ra lỗi: ' . $e->getMessage())->withInput();
         }
     }
 
     public function show(User $user)
+<<<<<<< HEAD
 {
     // Tải các quan hệ cần thiết, đảm bảo gọi đúng tên 'sections' (số nhiều)
     $user->load([
@@ -283,6 +280,102 @@ class UserController extends Controller
     DB::beginTransaction();
     try {
         $updateData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id']);
+=======
+    {
+        $user->load('mainBranch', 'jobTitle', 'sections', 'assignments.approvalRank', 'assignments.group', 'assignments.branch');
+
+        $userRankLevel = $user->assignments->first()->approvalRank->rank_level ?? null;
+        $userSectionIds = $user->sections->pluck('id');
+
+        $requestingSuperiors = $this->findSuperiorsInGroup($user, 'Phòng Đề Nghị', $userRankLevel, $userSectionIds);
+        $purchasingSuperiors = $this->findSuperiorsInGroup($user, 'Phòng Mua', $userRankLevel, $userSectionIds);
+
+        $rankOrder = ApprovalRank::orderBy('rank_level')->pluck('name')->flip();
+
+        $requestingSuperiors = $requestingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
+            return $rankOrder[$rankName] ?? 999;
+        });
+
+        $purchasingSuperiors = $purchasingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
+            return $rankOrder[$rankName] ?? 999;
+        });
+
+        return view('admin.users.show', compact('user', 'requestingSuperiors', 'purchasingSuperiors'));
+    }
+
+    private function findSuperiorsInGroup(User $user, string $groupName, ?int $userRankLevel, Collection $userSectionIds): Collection
+    {
+        if (is_null($userRankLevel)) {
+            return collect();
+        }
+        $groupId = Group::where('name', $groupName)->value('id');
+        if (!$groupId) {
+            return collect();
+        }
+
+        $superiorsQuery = User::where('id', '!=', $user->id)
+            ->whereHas('assignments', function ($query) use ($userRankLevel, $groupId) {
+                $query->where('group_id', $groupId)
+                      ->whereHas('approvalRank', function ($q) use ($userRankLevel) {
+                          $q->where('rank_level', '>', $userRankLevel);
+                      });
+            });
+
+        if ($userSectionIds->isNotEmpty()) {
+            $superiorsQuery->whereHas('sections', function ($q) use ($userSectionIds) {
+                $q->whereIn('sections.id', $userSectionIds);
+            });
+        } else {
+            return collect();
+        }
+
+        return $superiorsQuery->with('assignments.approvalRank')->get()->flatMap(function ($superior) use ($groupId) {
+            return $superior->assignments->where('group_id', $groupId)->map(function ($assignment) use ($superior) {
+                return [
+                    'rank_name' => $assignment->approvalRank->name,
+                    'user' => $superior
+                ];
+            });
+        })->groupBy('rank_name')->map(fn($group) => $group->pluck('user')->unique('id'));
+    }
+
+    public function edit(User $user)
+    {
+        $user->load('sections', 'assignments');
+        $branches = Branch::all();
+        $sections = Section::all();
+        $groups = Group::all();
+        $ranks = ApprovalRank::where('rank_level', '>', 0)->get();
+        $jobTitles = JobTitle::all();
+        $managers = User::where('id', '!=', $user->id)->whereHas('assignments.approvalRank', fn($q) => $q->where('rank_level', '>=', 2))->orderBy('name')->get();
+        $userSections = $user->sections->pluck('id')->toArray();
+        $userAssignments = $user->assignments->pluck('approval_rank_id', 'group_id')->all();
+        return view('admin.users.edit', compact('user', 'branches', 'sections', 'groups', 'ranks', 'userSections', 'userAssignments', 'jobTitles', 'managers'));
+    }
+
+    public function update(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'employee_id' => 'required|string|max:255|unique:users,employee_id,' . $user->id,
+            'prs_id' => 'nullable|string|max:50|unique:users,prs_id,' . $user->id,
+            'password' => ['nullable', 'confirmed', Rules\Password::min(8)],
+            'job_title_id' => 'required|exists:job_titles,id',
+            'main_branch_id' => 'required|exists:branches,id',
+            'manager_id' => 'nullable|exists:users,id',
+            'status' => 'required|boolean',
+            'signature_image' => 'nullable|image|mimes:png,jpg,jpeg|max:1024',
+            'sections' => 'required|array',
+            'sections.*' => 'exists:sections,id',
+            'assignments' => 'nullable|array',
+            'assignments.*' => 'nullable|exists:approval_ranks,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $updateData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id', 'manager_id']);
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
 
         if ($request->filled('password')) {
             $updateData['password'] = Hash::make($request->password);
@@ -300,6 +393,7 @@ class UserController extends Controller
             $updateData['signature_image_path'] = $path;
         }
 
+<<<<<<< HEAD
         $user->update($updateData);
         $user->sections()->sync($validated['sections']);
 
@@ -319,6 +413,44 @@ class UserController extends Controller
                     }
                 }
             }
+=======
+            if ($request->hasFile('signature_image')) {
+                if ($user->signature_image_path) {
+                    Storage::disk('public')->delete($user->signature_image_path);
+                }
+                $imageFile = $request->file('signature_image');
+                $employeeId = $validated['employee_id'];
+                $extension = $imageFile->getClientOriginalExtension();
+                $newFileName = $employeeId . '.' . $extension;
+                $path = $imageFile->storeAs('signatures', $newFileName, 'public');
+                $updateData['signature_image_path'] = $path;
+            }
+
+            $user->update($updateData);
+            $user->sections()->sync($validated['sections']);
+
+            if ($request->has('assignments')) {
+                $user->assignments()->delete();
+                if (!empty($validated['assignments'])) {
+                    foreach ($validated['assignments'] as $group_id => $approval_rank_id) {
+                        if (!empty($approval_rank_id)) {
+                            $user->assignments()->create([
+                                'group_id' => $group_id,
+                                'branch_id' => $validated['main_branch_id'],
+                                'approval_rank_id' => $approval_rank_id,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('admin.users.index')->with('success', 'Cập nhật người dùng thành công.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Lỗi cập nhật người dùng: ' . $e->getMessage());
+            return back()->with('error', 'Đã xảy ra lỗi: ' . $e->getMessage())->withInput();
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
         }
 
         DB::commit();
@@ -328,7 +460,11 @@ class UserController extends Controller
         \Log::error('Lỗi cập nhật người dùng: ' . $e->getMessage());
         return back()->with('error', 'Đã xảy ra lỗi: ' . $e->getMessage())->withInput();
     }
+<<<<<<< HEAD
 }
+=======
+
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
     public function destroy(User $user)
     {
         DB::beginTransaction();
@@ -346,7 +482,6 @@ class UserController extends Controller
         }
     }
 
-    // ---- CÁC HÀM XỬ LÝ IMPORT ----
     public function showImportForm()
     {
         $this->authorize('create', User::class);
@@ -404,18 +539,15 @@ class UserController extends Controller
             return back()->with('error', 'Không thể mở file ZIP.');
         }
     }
+
     public function toggleStatus(User $user)
     {
-        $this->authorize('toggleStatus', $user);
-
+        $this->authorize('update', $user);
         try {
             $user->status = !$user->status;
             $user->save();
-
             $message = $user->status ? 'Kích hoạt tài khoản thành công.' : 'Vô hiệu hóa tài khoản thành công.';
-
             return redirect()->route('admin.users.index')->with('success', $message);
-
         } catch (\Exception $e) {
             Log::error('Lỗi khi thay đổi trạng thái người dùng: ' . $e->getMessage());
             return back()->with('error', 'Đã xảy ra lỗi khi thay đổi trạng thái người dùng.');

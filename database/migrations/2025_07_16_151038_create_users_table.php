@@ -19,6 +19,8 @@ return new class extends Migration
             $table->string('password');
             $table->string('signature_image_path')->nullable();
             $table->boolean('status')->default(true);
+             // ✅ THÊM MỚI: Cột để lưu ID của người quản lý trực tiếp
+            $table->foreignId('manager_id')->nullable()->constrained('users')->onDelete('set null');
             $table->rememberToken();
             $table->timestamps();
         });

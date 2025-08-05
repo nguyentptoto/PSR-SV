@@ -24,8 +24,8 @@
                     @endphp
 
                     @if (in_array($purchaseRequest->status, ['purchasing_approval', 'completed']))
-                        {{-- <a href="{{ route('users.purchase-requests.export', $purchaseRequest->id) }}"
-                            class="btn btn-success"><i class="bi bi-file-earmark-excel"></i> Export Excel</a> --}}
+                        <a href="{{ route('users.purchase-requests.export', $purchaseRequest->id) }}"
+                            class="btn btn-success"><i class="bi bi-file-earmark-excel"></i> Export Excel</a>
                         <a href="{{ route('users.purchase-requests.export.pdf', $purchaseRequest) }}"
                             class="btn btn-danger">
                             Export to PDF
@@ -150,7 +150,11 @@
                     <li class="list-group-item">
                         <div class="d-flex">
                             <div class="me-3">
+<<<<<<< HEAD
                                @if ($history->signature_image_path && $history->signature_image_path !== 'no-signature.png')
+=======
+                                   @if ($history->signature_image_path && $history->signature_image_path !== 'no-signature.png')
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
     {{-- Nếu có chữ ký hợp lệ, hiển thị nó từ storage --}}
     <img src="{{ asset('storage/' . $history->signature_image_path) }}" alt="Chữ ký"
          class="img-thumbnail" style="width: 80px; height: 80px; object-fit: contain;">
@@ -193,75 +197,104 @@
     </div>
     {{-- ✅ THÊM MỚI: Card Hành động Phê duyệt --}}
     @can('approve', $purchaseRequest)
-        <div class="card card-success">
-            <div class="card-header">
-                <h3 class="card-title">Hành động Phê duyệt</h3>
-            </div>
-            <div class="card-body text-center">
-                <p>Bạn có quyền xử lý phiếu này ở cấp duyệt hiện tại.</p>
-                <button type="button" class="btn btn-lg btn-success" data-bs-toggle="modal" data-bs-target="#approveModal"
-                    data-action-url="{{ route('users.approvals.approve', $purchaseRequest->id) }}">
-                    <i class="bi bi-check-circle-fill"></i> Phê duyệt
-                </button>
-                <button type="button" class="btn btn-lg btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal"
-                    data-action-url="{{ route('users.approvals.reject', $purchaseRequest->id) }}">
-                    <i class="bi bi-x-circle-fill"></i> Từ chối
-                </button>
-            </div>
-        </div>
-    @endcan
-    {{-- ✅ THÊM MỚI: Các Modals --}}
-
-    <!-- Modal Phê duyệt -->
-    <div class="modal fade" id="approveModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Xác nhận Phê duyệt</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form id="approve-form" method="POST" action="">
-                    @csrf
-                    <div class="modal-body">
-                        <p>Bạn có chắc chắn muốn phê duyệt phiếu này?</p>
-                        <div class="mb-3">
-                            <label for="approve_comment" class="form-label">Ghi chú (tùy chọn):</label>
-                            <textarea class="form-control" id="approve_comment" name="comment" rows="3"></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                        <button type="submit" class="btn btn-success">Xác nhận Duyệt</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+<div class="card card-success">
+    <div class="card-header">
+        <h3 class="card-title">Hành động Phê duyệt</h3>
     </div>
-
-    <!-- Modal Từ chối -->
-    <div class="modal fade" id="rejectModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Lý do từ chối</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form id="reject-form" method="POST" action="">
-                    @csrf
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="reject_comment" class="form-label">Vui lòng nhập lý do từ chối (bắt buộc):</label>
-                            <textarea class="form-control" id="reject_comment" name="comment" rows="3" required></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                        <button type="submit" class="btn btn-danger">Xác nhận Từ chối</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+    <div class="card-body text-center">
+        <p>Bạn có quyền xử lý phiếu này ở cấp duyệt hiện tại.</p>
+        {{-- ✅ SỬA ĐỔI: Các nút này giờ sẽ kích hoạt modal tùy chỉnh --}}
+        <button type="button" class="btn btn-lg btn-success approve-btn" data-action-url="{{ route('users.approvals.approve', $purchaseRequest->id) }}">
+            <i class="bi bi-check-circle-fill"></i> Phê duyệt
+        </button>
+        <button type="button" class="btn btn-lg btn-danger reject-btn" data-action-url="{{ route('users.approvals.reject', $purchaseRequest->id) }}">
+            <i class="bi bi-x-circle-fill"></i> Từ chối
+        </button>
     </div>
+</div>
+@endcan
+{{-- Modal Phê duyệt (Phiên bản tùy chỉnh) --}}
+<div class="custom-modal-overlay" id="approveModalOverlay">
+    <div class="custom-modal-content">
+      <div class="custom-modal-header">
+        <h5 class="custom-modal-title">Xác nhận Phê duyệt</h5>
+        <button type="button" class="custom-modal-close" data-modal-dismiss>&times;</button>
+      </div>
+      <form id="approve-form" method="POST" action="">
+          @csrf
+          <div class="custom-modal-body">
+              <p>Bạn có chắc chắn muốn phê duyệt phiếu này?</p>
+              <div class="mb-3">
+                  <label for="approve_comment" class="form-label">Ghi chú (tùy chọn):</label>
+                  <textarea class="form-control" id="approve_comment" name="comment" rows="3"></textarea>
+              </div>
+          </div>
+          <div class="custom-modal-footer">
+            <button type="button" class="btn btn-secondary" data-modal-dismiss>Hủy</button>
+            <button type="submit" class="btn btn-success">Xác nhận Duyệt</button>
+          </div>
+      </form>
+    </div>
+</div>
 
+{{-- Modal Từ chối (Phiên bản tùy chỉnh) --}}
+<div class="custom-modal-overlay" id="rejectModalOverlay">
+    <div class="custom-modal-content">
+      <div class="custom-modal-header">
+        <h5 class="custom-modal-title">Lý do từ chối</h5>
+        <button type="button" class="custom-modal-close" data-modal-dismiss>&times;</button>
+      </div>
+      <form id="reject-form" method="POST" action="">
+          @csrf
+          <div class="custom-modal-body">
+              <div class="mb-3">
+                  <label for="reject_comment" class="form-label">Vui lòng nhập lý do từ chối (bắt buộc):</label>
+                  <textarea class="form-control" id="reject_comment" name="comment" rows="3" required></textarea>
+              </div>
+          </div>
+          <div class="custom-modal-footer">
+            <button type="button" class="btn btn-secondary" data-modal-dismiss>Hủy</button>
+            <button type="submit" class="btn btn-danger">Xác nhận Từ chối</button>
+          </div>
+      </form>
+    </div>
+</div>
 
 @endsection
+@push('scripts')
+<script>
+    $(document).ready(function() {
+        // --- Logic cho Modal Tùy chỉnh ---
+        function openModal(modalOverlay) {
+            modalOverlay.css('display', 'flex');
+            setTimeout(() => modalOverlay.addClass('show'), 10);
+        }
+
+        function closeModal(modalOverlay) {
+            modalOverlay.removeClass('show');
+            setTimeout(() => modalOverlay.css('display', 'none'), 300);
+        }
+
+        // Xử lý Modal Phê duyệt
+        const approveModal = $('#approveModalOverlay');
+        $('.approve-btn').on('click', function() {
+            let actionUrl = $(this).data('action-url');
+            approveModal.find('#approve-form').attr('action', actionUrl);
+            openModal(approveModal);
+        });
+
+        // Xử lý Modal Từ chối
+        const rejectModal = $('#rejectModalOverlay');
+        $('.reject-btn').on('click', function() {
+            let actionUrl = $(this).data('action-url');
+            rejectModal.find('#reject-form').attr('action', actionUrl);
+            openModal(rejectModal);
+        });
+
+        // Gắn sự kiện đóng cho tất cả các nút có thuộc tính data-modal-dismiss
+        $('[data-modal-dismiss]').on('click', function() {
+            closeModal($(this).closest('.custom-modal-overlay'));
+        });
+    });
+</script>
+@endpush

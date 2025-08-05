@@ -14,7 +14,7 @@
 <!--end::Required Plugin(Bootstrap 5)--><!--begin::Required Plugin(AdminLTE)-->
 
 <script src="{{ asset('js/adminlte.js') }}"></script>
-<script src="{{ asset('js/app.js') }}"></script>
+<script src="{{ asset('/js/app.js') }}"></script>
 
 <script src="{{ asset('js/xlsx.full.min.js') }}"></script>
 <script src="{{ asset('js/ripples.js') }}"></script>

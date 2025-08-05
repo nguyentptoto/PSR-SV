@@ -27,6 +27,11 @@ return new class extends Migration
             $table->string('using_dept_code')->nullable();
             $table->string('plant_system')->nullable();
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
             $table->timestamps();
         });
     }
