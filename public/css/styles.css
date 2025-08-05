@@ -398,3 +398,7 @@ html.theme-animated .card {
     z-index: 9999;
     transition: all 0.2s ease-out;
 }
+
+.card.card-success.mt-4{
+    padding: 0 !important;
+}

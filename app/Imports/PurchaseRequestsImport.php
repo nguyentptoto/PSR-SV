@@ -242,8 +242,8 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
                     'subtotal' => $subtotal,
                     'using_dept_code' => (string)($itemData['trackingno'] ?? null),
                     'plant_system' => $plantSystem,
-                    'purchase_group' => $purchaseGroup,
-                    'legacy_item_code' => $legacyItemCode,
+                    // 'purchase_group' => $purchaseGroup,
+                    // 'legacy_item_code' => $legacyItemCode,
                 ];
 
                 $currentPrTotalAmount += $subtotal;

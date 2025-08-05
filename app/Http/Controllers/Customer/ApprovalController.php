@@ -252,9 +252,10 @@ class ApprovalController extends Controller
                     ->where('group_id', $targetGroupId);
             });
 
-        if ($isRequestingStage && $nextRankLevel < 4) {
+        if ($isRequestingStage) {
             $approverQuery->whereHas('sections', fn($q) => $q->where('sections.id', $sectionId));
         }
+
 
         if ($nextRankLevel == 4 && !$pr->requires_director_approval && $isRequestingStage) {
             return collect();

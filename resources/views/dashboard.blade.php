@@ -21,20 +21,25 @@
                 <h3 class="card-title">Thông tin quyền hạn của bạn</h3>
             </div>
             <div class="card-body">
-                @if($user->assignments->isNotEmpty())
-                    <ul class="list-group">
-                        @foreach($user->assignments as $assignment)
-                            <li class="list-group-item">
-                                Tại chi nhánh <strong>{{ $assignment->branch->name }}</strong>,
-                                trong nhóm <strong>{{ $assignment->group->name }}</strong>,
-                                bạn có <strong>{{ $assignment->approvalRank->name }}</strong>.
-                            </li>
-                        @endforeach
-                    </ul>
-                @else
-                    <p>Bạn chưa được gán quyền hạn nào.</p>
-                @endif
-            </div>
+
+            @php
+                $mainBranchAssignments = $user->assignments->where('branch_id', $user->main_branch_id);
+            @endphp
+
+            @if ($mainBranchAssignments->isNotEmpty())
+                <ul class="list-group">
+                    @foreach ($mainBranchAssignments as $assignment)
+                        <li class="list-group-item">
+                            Tại chi nhánh chính <strong>{{ $assignment->branch->name }}</strong>,
+                            trong nhóm <strong>{{ $assignment->group->name }}</strong>,
+                            bạn có quyền <strong>{{ $assignment->approvalRank->name }}</strong>.
+                        </li>
+                    @endforeach
+                </ul>
+            @else
+                <p>Bạn chưa được gán quyền hạn nào tại chi nhánh chính.</p>
+            @endif
+        </div>
         </div>
 
         {{-- Ví dụ hiển thị một phần tử chỉ dành cho admin --}}

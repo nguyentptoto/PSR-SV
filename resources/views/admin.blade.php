@@ -73,7 +73,7 @@
             <div class="float-end d-none d-sm-inline">Hệ thống hỗ trợ cho nhân viên</div>
 
             <strong>
-                Hệ thống PSR &nbsp;
+                Hệ thống PRS &nbsp;
                 <a href="{{ route('support.index') }}" class="text-decoration-none">Hỗ trợ liên hệ</a>.
             </strong>
         </footer>
@@ -82,20 +82,20 @@
 
     @include('script')
     @include('admin._partials.toast')
-<script type="text/javascript">
-function googleTranslateElementInit() {
-  new google.translate.TranslateElement({
-    // Ngôn ngữ gốc của trang web của bạn
-    pageLanguage: 'vi',
-    // Chỉ định các ngôn ngữ bạn muốn hiển thị trong danh sách
-    includedLanguages: 'en,ja,ko,zh-CN,fr',
-    // Giao diện: ngang, dọc, hoặc chỉ có icon
-    layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-    // Tự động ẩn banner của Google sau khi dịch
-    autoDisplay: false
-  }, 'google_translate_element');
-}
-</script>
+    <script type="text/javascript">
+    function googleTranslateElementInit() {
+    new google.translate.TranslateElement({
+        // Ngôn ngữ gốc của trang web của bạn
+        pageLanguage: 'vi',
+        // Chỉ định các ngôn ngữ bạn muốn hiển thị trong danh sách
+        includedLanguages: 'en,ja',
+        // Giao diện: ngang, dọc, hoặc chỉ có icon
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+        // Tự động ẩn banner của Google sau khi dịch
+        autoDisplay: false
+    }, 'google_translate_element');
+    }
+    </script>
 
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>

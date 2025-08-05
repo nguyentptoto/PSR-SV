@@ -60,8 +60,7 @@
             <label class="custom-file-label" for="signature_image">Chọn file</label>
         </div>
         @if (isset($user) && $user->signature_image_path)
-            <div class="mt-2"><img src="{{ Storage::url($user->signature_image_path) }}" alt="Chữ ký"
-                    height="50"></div>
+            <div class="mt-2"><img src="{{ asset('storage/' . $user->signature_image_path) }}" alt="Chữ ký" height="150">       </div>
         @endif
     </div>
 

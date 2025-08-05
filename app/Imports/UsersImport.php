@@ -79,7 +79,7 @@ class UsersImport implements ToCollection, WithHeadingRow
 
                 // Chuẩn bị dữ liệu để cập nhật hoặc tạo mới
                 $userData = [
-                    'name' => trim($row['last_name'] ?? '') . ' ' . trim($row['frist_name'] ?? ''),
+                    'name' => trim($row['full_name'] ?? ''),
                     'email' => trim($row['e_mail_address']),
                     'prs_id' => $prsId,
                     'job_title_id' => $jobTitleId,
