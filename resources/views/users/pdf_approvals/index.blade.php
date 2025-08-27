@@ -62,10 +62,15 @@
             @endif
 
             <div class="mb-3">
-                {{-- Button này sẽ được dùng để trigger modal duyệt hàng loạt --}}
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#bulkApprovePdfModal">
                     <i class="bi bi-check2-square"></i> Duyệt các mục đã chọn
                 </button>
+                    <a href="#" class="btn btn-info" id="bulk-preview-btn">
+                            <i class="fas fa-eye"></i> Xem trước hàng loạt
+                    </a>
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#bulkRejectModal">
+                        <i class="bi bi-x-square"></i> Từ chối các mục đã chọn
+                    </button>
             </div>
 
             <div class="table-responsive">
@@ -77,6 +82,8 @@
                             <th>Người tạo</th>
                             <th>Phòng ban</th>
                             <th>Trạng thái hiện tại</th>
+                            {{-- BỔ SUNG CỘT MỚI --}}
+                            <th>Yêu cầu Giám đốc duyệt</th>
                             <th>Ngày tạo</th>
                             <th style="width: 250px;">Hành động</th>
                         </tr>
@@ -86,7 +93,7 @@
                             <tr>
                                 <td>
                                     <input type="checkbox" name="request_ids[]" class="request-checkbox-pdf"
-                                           value="{{ $pdfPr->id }}">
+                                            value="{{ $pdfPr->id }}">
                                 </td>
                                 <td>{{ $pdfPr->pia_code }}</td>
                                 <td>{{ $pdfPr->requester->name ?? 'N/A' }}</td>
@@ -104,29 +111,38 @@
                                     @endphp
                                     <span class="badge {{ $statusClass }}">{{ __($pdfPr->status) }} (Cấp {{ $pdfPr->current_rank_level }})</span>
                                 </td>
+                                {{-- BỔ SUNG CỘT DỮ LIỆU MỚI --}}
+                                <td>
+                                    @if($pdfPr->requires_director_approval)
+                                        <span class="badge badge-danger">Có</span>
+                                    @else
+                                        <span class="badge badge-success">Không</span>
+                                    @endif
+                                </td>
                                 <td>{{ $pdfPr->created_at->format('d/m/Y H:i') }}</td>
                                 <td>
                                     <a href="{{ route('users.pdf-requests.show', $pdfPr->id) }}" class="btn btn-sm btn-info" title="Xem chi tiết">
                                         <i class="fas fa-eye"></i> Xem
                                     </a>
-                                    <a href="{{ route('users.pdf-requests.view-file', $pdfPr->id) }}" target="_blank" class="btn btn-sm btn-secondary" title="Xem PDF gốc">
-                                        <i class="fas fa-file-pdf"></i> Xem PDF
-                                    </a>
-
-                                    {{-- Buttons for approval/rejection --}}
+                                     @if ($pdfPr->signed_pdf_path)
+                                        <a href="{{ asset('storage/' . $pdfPr->signed_pdf_path) }}" target="_blank"
+                                            class="btn btn-secondary btn-sm" title="Xem PDF đã ký">
+                                            <i class="fas fa-file-pdf"></i> PDF
+                                        </a>
+                                    @endif
                                     <button type="button" class="btn btn-sm btn-success"
-                                            data-bs-toggle="modal" data-bs-target="#approvePdfModal"
-                                            data-action-url="{{ route('users.pdf-approvals.approve', $pdfPr->id) }}"
-                                            data-request-id="{{ $pdfPr->id }}">Duyệt</button>
+                                                data-bs-toggle="modal" data-bs-target="#approvePdfModal"
+                                                data-action-url="{{ route('users.pdf-approvals.approve', $pdfPr->id) }}"
+                                                data-request-id="{{ $pdfPr->id }}">Duyệt</button>
                                     <button type="button" class="btn btn-sm btn-danger"
-                                            data-bs-toggle="modal" data-bs-target="#rejectPdfModal"
-                                            data-action-url="{{ route('users.pdf-approvals.reject', $pdfPr->id) }}"
-                                            data-request-id="{{ $pdfPr->id }}">Từ chối</button>
+                                                data-bs-toggle="modal" data-bs-target="#rejectPdfModal"
+                                                data-action-url="{{ route('users.pdf-approvals.reject', $pdfPr->id) }}"
+                                                data-request-id="{{ $pdfPr->id }}">Từ chối</button>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center">Không có phiếu PDF nào cần xử lý.</td>
+                                <td colspan="8" class="text-center">Không có phiếu PDF nào cần xử lý.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -138,7 +154,31 @@
         </div>
     </form>
 </div>
-
+ {{-- Modal từ chối hàng loạt --}}
+    <div class="modal fade" id="bulkRejectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận Từ chối Hàng Loạt</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="bulk-reject-form" method="POST" action="{{ route('users.pdf-approvals.bulk-reject') }}">
+                    @csrf
+                    <div class="modal-body">
+                        <p>Bạn có chắc chắn muốn từ chối tất cả các phiếu đã chọn không?</p>
+                        <div class="mb-3">
+                            <label for="bulk_reject_comment" class="form-label">Lý do từ chối (bắt buộc):</label>
+                            <textarea class="form-control" id="bulk_reject_comment" name="comment" rows="3" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-danger">Xác nhận Từ chối</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 <div class="modal fade" id="bulkApprovePdfModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -242,7 +282,6 @@
         $('#bulkApprovePdfModal').on('show.bs.modal', function (event) {
             const selectedCount = $('input.request-checkbox-pdf:checked').length;
 
-            // Xóa các input cũ để tránh trùng lặp
             $('#bulk-approve-pdf-form').find('input[name="request_ids[]"]').remove();
 
             if (selectedCount === 0) {
@@ -251,17 +290,49 @@
                 return;
             }
 
-            // Cập nhật số lượng
             $('#selected-pdf-count').text(selectedCount);
 
-            // Thêm các input đã chọn vào form trong modal
             $('input.request-checkbox-pdf:checked').each(function() {
-                // Tạo một bản sao của checkbox đã chọn và thêm vào form
                 $('#bulk-approve-pdf-form').append(
                     $('<input>').attr('type', 'hidden').attr('name', 'request_ids[]').val($(this).val())
                 );
             });
         });
+        $('#bulk-preview-btn').on('click', function(event) {
+                const selectedIds = $('input.request-checkbox-pdf:checked').map(function() {
+                    return $(this).val();
+                }).get();
+
+                if (selectedIds.length === 0) {
+                    alert('Vui lòng chọn ít nhất một phiếu để xem trước.');
+                    event.preventDefault();
+                    return;
+                }
+
+                const url = '{{ route('users.pdf-approvals.bulk-preview') }}' + '?ids[]=' + selectedIds
+                    .join('&ids[]=');
+                 window.open(url, '_blank'); // SỬA ĐỔI Ở ĐÂY
+                event.preventDefault();
+            });
+              $('#bulkRejectModal').on('show.bs.modal', function(event) {
+                const selectedCount = $('input.request-checkbox-pdf:checked').length;
+                const form = $('#bulk-reject-form');
+
+                form.find('input[name="request_ids[]"]').remove();
+
+                if (selectedCount === 0) {
+                    alert('Vui lòng chọn ít nhất một phiếu để từ chối.');
+                    event.preventDefault();
+                    return;
+                }
+
+                $('input.request-checkbox-pdf:checked').each(function() {
+                    form.append(
+                        $('<input>').attr('type', 'hidden').attr('name', 'request_ids[]').val($(
+                            this).val())
+                    );
+                });
+            });
     });
 </script>
 @endpush

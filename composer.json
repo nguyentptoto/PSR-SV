@@ -19,6 +19,7 @@
         "maatwebsite/excel": "^3.1",
         "mpdf/mpdf": "^8.2",
         "setasign/fpdi": "^2.6",
+        "setasign/fpdi-tcpdf": "^2.3",
         "tecnick.com/tcpdf": "^6.10"
     },
     "require-dev": {

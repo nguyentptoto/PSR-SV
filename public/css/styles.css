@@ -429,17 +429,19 @@ html.theme-animated .card {
     transition: all 0.2s ease-out;
 }
 
-<<<<<<< HEAD
-.card.card-success.mt-4{
-    padding: 0 !important;
-}
-=======
 span.badge.badge-warning, span.badge.badge-secondary,span.badge.badge-primary{
     background-color: #ffc107 !important;
     color: #212529 !important;
+}
+span.badge.badge-info{
+    background-color: #00ff22ab !important;
+    color: #ffffff !important;
 }
 span.badge.badge-danger{
     background-color: #dc3545 !important;
     color: #fff !important;
 }
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
+span.badge.badge-success{
+    background-color: #28a745 !important;
+    color: #fff !important;
+}

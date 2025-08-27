@@ -272,12 +272,7 @@ foreach ($nextApprovers as $approver) {
             $approverQuery->whereHas('sections', fn($q) => $q->where('sections.id', $sectionId));
         }
 
-<<<<<<< HEAD
-
-        if ($nextRankLevel == 4 && !$pr->requires_director_approval && $isRequestingStage) {
-=======
         if ($isRequestingStage && $nextRankLevel == 4 && !$pr->requires_director_approval) {
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
             return collect();
         }
 

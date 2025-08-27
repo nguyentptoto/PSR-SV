@@ -9,7 +9,8 @@ use App\Http\Controllers\Customer\ApprovalController; // Controller cho phê duy
 use App\Http\Controllers\Customer\PdfPurchaseRequestController;
 use App\Http\Controllers\Customer\PdfApprovalController; // THÊM DÒNG NÀY: Controller cho phê duyệt PDF
 use App\Http\Controllers\SupportController;
-
+use App\Http\Controllers\Manager\StaffController;
+use App\Http\Controllers\Manager\VendorController;
 
 // --- ROUTE CÔNG KHAI ---
 Route::get('/', fn() => redirect()->route('login'));
@@ -28,6 +29,8 @@ Route::middleware(['auth'])->group(function () {
     // --- NHÓM ROUTE CHO NGƯỜI DÙNG (CUSTOMER) ---
     Route::prefix('users')->name('users.')->group(function () {
 
+        // ✅ THÊM ROUTE MỚI CHO TRANG "VIỆC ĐƯỢC GIAO"
+        Route::get('/assignments', [ApprovalController::class, 'myAssignments'])->name('assignments.index');
         // Các route export cho một phiếu đề nghị cụ thể (Excel)
         Route::get('purchase-requests/{purchaseRequest}/export', [PurchaseRequestController::class, 'exportExcel'])->name('purchase-requests.export');
         Route::get('purchase-requests/{purchaseRequest}/export-pdf', [PurchaseRequestController::class, 'exportPdf'])->name('purchase-requests.export.pdf');
@@ -44,6 +47,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('pdf-requests/create', [PdfPurchaseRequestController::class, 'create'])->name('pdf-requests.create');
         Route::post('pdf-requests/store', [PdfPurchaseRequestController::class, 'store'])->name('pdf-requests.store');
         Route::get('pdf-requests/{pdfPurchaseRequest}/preview-sign', [PdfPurchaseRequestController::class, 'previewSign'])->name('pdf-requests.preview-sign');
+
+        // Route xem trước nhiều phiếu (dành cho chức năng ký hàng loạt)
+        Route::get('pdf-requests/preview-sign-batch', [PdfPurchaseRequestController::class, 'previewSignBatch'])->name('pdf-requests.preview-sign-batch');
+
+        // Route xử lý ký hàng loạt (dùng cho form trên view)
+        Route::post('pdf-requests/sign-submit-batch', [PdfPurchaseRequestController::class, 'signAndSubmitBatch'])->name('pdf-requests.sign-submit-batch');
         Route::post('pdf-requests/{pdfPurchaseRequest}/sign-submit', [PdfPurchaseRequestController::class, 'signAndSubmit'])->name('pdf-requests.sign-submit');
         Route::get('pdf-requests/{pdfPurchaseRequest}/view-file', [PdfPurchaseRequestController::class, 'viewFile'])->name('pdf-requests.view-file');
 
@@ -68,6 +77,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{purchaseRequest}/assign', [ApprovalController::class, 'assign'])->name('assign');
             Route::post('/{purchaseRequest}/approve', [ApprovalController::class, 'approve'])->name('approve');
             Route::post('/{purchaseRequest}/reject', [ApprovalController::class, 'reject'])->name('reject');
+
         });
 
         // THÊM NHÓM ROUTE MỚI CHO PHÊ DUYỆT PDF
@@ -77,6 +87,8 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/bulk-approve', [PdfApprovalController::class, 'bulkApprove'])->name('bulk-approve');
             Route::post('/{pdfPurchaseRequest}/approve', [PdfApprovalController::class, 'approve'])->name('approve');
             Route::post('/{pdfPurchaseRequest}/reject', [PdfApprovalController::class, 'reject'])->name('reject');
+            Route::post('/bulk-reject', [PdfApprovalController::class, 'bulkReject'])->name('bulk-reject'); // THÊM ROUTE MỚI CHO PHÊ DUYỆT PDF
+            Route::get('/bulk-preview', [PdfApprovalController::class, 'bulkPreview'])->name('bulk-preview');
         });
     });
 
@@ -95,30 +107,19 @@ Route::middleware(['auth'])->group(function () {
         // Route resource phải để sau cùng
         Route::resource('users', UserController::class);
     });
-    Route::get('/test-mpdf', function () {
-    // Tạo một thư mục test riêng để không bị nhầm lẫn
-    $tempDir = storage_path('app/mpdf_test');
 
-    // Tạo thư mục nếu nó chưa tồn tại
-    if (!is_dir($tempDir)) {
-        mkdir($tempDir, 0777, true);
-    }
-
-    try {
-        // Khởi tạo MPDF trực tiếp với cấu hình thư mục tạm
-        $mpdf = new \Mpdf\Mpdf([
-            'tempDir' => $tempDir
-        ]);
-
-        // Ghi một nội dung HTML đơn giản có tiếng Việt
-        $mpdf->WriteHTML('<h1>Xin chào thế giới!</h1><p>Đây là file PDF được tạo độc lập để kiểm tra MPDF.</p>');
-
-        // Xuất file PDF ra thẳng trình duyệt
-        return $mpdf->Output('test_mpdf.pdf', 'I');
-
-    } catch (\Exception $e) {
-        // Nếu có bất kỳ lỗi nào xảy ra, nó sẽ hiện ra rõ ràng
-        dd($e->getMessage());
-    }
 });
-});
+Route::middleware(['auth', 'can:is-purchasing-manager'])
+    ->prefix('manager')
+    ->name('manager.')
+    ->group(function () {
+
+        // Route cho quản lý nhân viên cấp dưới
+        Route::resource('staffs', StaffController::class);
+        Route::get('vendors/import', [VendorController::class, 'showImportForm'])->name('vendors.import.form');
+        Route::post('vendors/import', [VendorController::class, 'handleImport'])->name('vendors.import.handle');
+        // routes/web.php -> trong group manager
+        Route::post('vendors/{vendor}/assignments', [VendorController::class, 'addAssignment'])->name('vendors.assignments.store');
+        Route::delete('vendor-assignments/{assignment}', [VendorController::class, 'removeAssignment'])->name('vendors.assignments.destroy');
+        Route::resource('vendors', VendorController::class);
+    });

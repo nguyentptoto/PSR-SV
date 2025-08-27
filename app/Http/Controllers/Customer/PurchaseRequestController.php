@@ -75,10 +75,6 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
-<<<<<<< HEAD
-=======
-            'items.*.purchase_group' => 'nullable|string|max:20', // This column was removed from DB, but still in validation
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
 
         ]);
 
@@ -218,10 +214,6 @@ class PurchaseRequestController extends Controller
             'items.*.r3_price' => 'nullable|numeric|min:0',
             'items.*.using_dept_code' => 'nullable|string|max:255',
             'items.*.plant_system' => 'nullable|string|max:255',
-<<<<<<< HEAD
-=======
-            'items.*.purchase_group' => 'nullable|string|max:20',
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
 
         ]);
 
@@ -396,11 +388,7 @@ class PurchaseRequestController extends Controller
             // Lưu cả đường dẫn thư mục tạm cho việc cleanup sau này
             $sessionData = [
                 'purchase_requests' => $importedData,
-<<<<<<< HEAD
-                 'temp_attachments_dir' => null // Set to null as no ZIP is processed
-=======
                 'temp_attachments_dir' => null // Set to null as no ZIP is processed
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
             ];
             $request->session()->put('imported_purchase_requests_' . $sessionId, $sessionData);
 
@@ -451,153 +439,59 @@ class PurchaseRequestController extends Controller
         return view('users.purchase_requests.import_preview', compact('importedPurchaseRequests', 'executingDepartments', 'user', 'sessionId', 'tempAttachmentsDir'));
     }
 
-    public function createFromImport(Request $request)
+     public function createFromImport(Request $request)
     {
-        Log::info('--- Bắt đầu Debug createFromImport Request ---');
-        Log::info('Timestamp start: ' . microtime(true));
-
         $sessionId = $request->input('session_id');
         $sessionData = $request->session()->get('imported_purchase_requests_' . $sessionId);
 
         if (!$sessionId || !$sessionData) {
-            Log::error('DEBUG: Session data not found or expired in createFromImport. Timestamp: ' . microtime(true));
             return response()->json(['success' => false, 'message' => 'Phiên làm việc đã hết hạn hoặc dữ liệu không tồn tại. Vui lòng import lại.'], 400);
         }
 
         $importedPurchaseRequests = $sessionData['purchase_requests'];
-        $tempAttachmentsDir = $sessionData['temp_attachments_dir']; // This will be null now
-        Log::info('DEBUG: Session data retrieved. Number of PRs: ' . count($importedPurchaseRequests) . '. Temp dir: ' . ($tempAttachmentsDir ?? 'N/A') . '. Timestamp: ' . microtime(true));
-
         $createdCount = 0;
         $failedCount = 0;
         $errors = [];
-        $successfulPiaCodes = [];
 
         $requester = Auth::user();
         $branch = $requester->mainBranch;
         $section = $requester->sections->first();
 
-        $existingPiaCodes = PurchaseRequest::whereIn('pia_code', collect($importedPurchaseRequests)->pluck('pia_code')->toArray())
-            ->pluck('pia_code')
-            ->toArray();
-        Log::info('DEBUG: Existing PIA codes checked. Timestamp: ' . microtime(true));
-
-        // Lấy các file đính kèm riêng lẻ được upload từ form preview
-        // $request->file('prs') sẽ là một mảng các UploadedFile object, được index theo prIndex
-        $uploadedAttachments = $request->file('prs');
-        Log::info('DEBUG: Uploaded individual attachments from form:', $uploadedAttachments ?? []);
-
-        foreach ($importedPurchaseRequests as $prIndex => $prData) { // prData là từ session
-            // Lấy prFormData tương ứng từ request (đã có các chỉnh sửa của người dùng)
-            // prFormData chứa các input text, select và input file (nếu có)
+        foreach ($importedPurchaseRequests as $prIndex => $prWrapper) {
+            $prDataFromSession = $prWrapper['pr_data'];
+            $itemsDataFromSession = $prWrapper['items'];
             $prFormData = $request->input("prs.{$prIndex}");
 
-            // temporary_attachment_path từ session không còn được dùng nữa
-            // $temporaryAttachmentPathFromSession = $prData['temporary_attachment_path'] ?? null; // Removed this line
-
-            // Lấy file được upload thủ công cho PR này (nếu có)
-            $individualUploadedFile = null;
-            // Kiểm tra xem $uploadedAttachments[$prIndex] có tồn tại và là một UploadedFile object không
-            // Hoặc nếu nó là một mảng (khi input name là prs[index][attachment_file]), kiểm tra phần tử 'attachment_file'
-            if (isset($uploadedAttachments[$prIndex]) && $uploadedAttachments[$prIndex] instanceof \Illuminate\Http\UploadedFile) {
-                $individualUploadedFile = $uploadedAttachments[$prIndex];
-            } else if (isset($uploadedAttachments[$prIndex]['attachment_file']) && $uploadedAttachments[$prIndex]['attachment_file'] instanceof \Illuminate\Http\UploadedFile) {
-<<<<<<< HEAD
-                 $individualUploadedFile = $uploadedAttachments[$prIndex]['attachment_file'];
-=======
-                $individualUploadedFile = $uploadedAttachments[$prIndex]['attachment_file'];
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
-            }
-
-            // Validate file upload thủ công
-            if ($individualUploadedFile && !$individualUploadedFile->isValid()) {
-                $errors[] = "File đính kèm cho phiếu '{$prData['pia_code']}' không hợp lệ hoặc bị lỗi upload.";
-                Log::error("ERROR: Invalid file upload for PR '{$prData['pia_code']}'.");
-                $failedCount++;
-                continue; // Bỏ qua phiếu này nếu file không hợp lệ
-            }
-            // Thêm validation mime types và max size cho file upload thủ công
-            // (Đây là validation runtime, nên cũng cần validation ở trên đầu hàm createFromImport)
-            if ($individualUploadedFile) {
-                $allowedMimes = ['pdf', 'doc', 'docx', 'xls', 'xlsx'];
-                $fileExtension = $individualUploadedFile->getClientOriginalExtension();
-                if (!in_array($fileExtension, $allowedMimes)) {
-                    $errors[] = "File đính kèm cho phiếu '{$prData['pia_code']}' có định dạng không hợp lệ ({$fileExtension}). Chỉ chấp nhận PDF, Word, Excel.";
-                    $failedCount++;
-                    Log::error("ERROR: Invalid file extension for PR '{$prData['pia_code']}': {$fileExtension}.");
-                    continue;
-                }
-                $maxSize = 10240; // 10MB
-                if ($individualUploadedFile->getSize() / 1024 > $maxSize) {
-                    $errors[] = "File đính kèm cho phiếu '{$prData['pia_code']}' quá lớn (tối đa {$maxSize}KB).";
-                    $failedCount++;
-                    Log::error("ERROR: File size exceeded for PR '{$prData['pia_code']}'. Size: {$individualUploadedFile->getSize()}");
-                    continue;
-                }
-            }
-
-
-            // Xóa các trường tạm thời không thuộc DB khỏi prData trước khi tạo PurchaseRequest
-            unset($prData['items']);
-            unset($prData['temporary_attachment_path']); // Đảm bảo xóa nếu nó vẫn còn từ session cũ
-
-            // Hợp nhất dữ liệu: ưu tiên dữ liệu từ form, sau đó là từ session
-            $finalPrData = array_merge($prData, $prFormData);
-
-            // Lấy items từ form data (đây là items đã được người dùng chỉnh sửa)
-            $itemsData = $prFormData['items'] ?? [];
-
-            Log::info('DEBUG: Processing PR: ' . $finalPrData['pia_code'] . '. Timestamp: ' . microtime(true));
-
-            if (in_array($finalPrData['pia_code'], $existingPiaCodes) || PurchaseRequest::where('pia_code', $finalPrData['pia_code'])->exists()) {
-                $errors[] = "Mã phiếu PR_NO '{$finalPrData['pia_code']}' đã tồn tại trong hệ thống. Bỏ qua tạo phiếu này.";
-                $failedCount++;
-                Log::warning('DEBUG: PR already exists: ' . $finalPrData['pia_code']);
-                continue;
-            }
+            $finalPrData = array_merge($prDataFromSession, $prFormData);
 
             $finalPrData['requester_id'] = $requester->id;
             $finalPrData['branch_id'] = $branch->id;
             $finalPrData['section_id'] = $section->id;
-<<<<<<< HEAD
-            $finalPrData['requires_director_approval'] = (bool)($finalPrData['requires_director_approval'] ?? false);
-=======
             $finalPrData['requires_director_approval'] = (bool) ($finalPrData['requires_director_approval'] ?? false);
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
+
+            // SỬA ĐỔI QUAN TRỌNG: Thêm status và current_rank_level
+            $finalPrData['status'] = 'pending_approval';
+            $finalPrData['current_rank_level'] = 2;
+
+            $itemsDataFromForm = $prFormData['items'] ?? $itemsDataFromSession;
+
+            $processedItemsData = [];
+            foreach ($itemsDataFromForm as $item) {
+                $orderQuantity = (float)($item['order_quantity'] ?? 0);
+                $estimatedPrice = (float)($item['estimated_price'] ?? 0);
+                $item['subtotal'] = $orderQuantity * $estimatedPrice;
+                $processedItemsData[] = $item;
+            }
 
             DB::beginTransaction();
             try {
-                Log::info('DEBUG: Before PR create. Timestamp: ' . microtime(true));
+                if (PurchaseRequest::where('pia_code', $finalPrData['pia_code'])->exists()) {
+                    throw new \Exception("Mã phiếu PR_NO '{$finalPrData['pia_code']}' đã tồn tại.");
+                }
+
                 $purchaseRequest = PurchaseRequest::create($finalPrData);
-                Log::info('DEBUG: PR created (' . $purchaseRequest->id . '). Before items create. Timestamp: ' . microtime(true));
-                $purchaseRequest->items()->createMany($itemsData);
-                Log::info('DEBUG: Items created for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
+                $purchaseRequest->items()->createMany($processedItemsData);
 
-                $finalAttachmentPath = null;
-                // Xử lý file được upload thủ công
-                if ($individualUploadedFile && $individualUploadedFile->isValid()) {
-                    Log::info('DEBUG: Individual attachment uploaded. Storing new file for PR: ' . $purchaseRequest->pia_code . '. Timestamp: ' . microtime(true));
-                    $fileName = $individualUploadedFile->getClientOriginalName();
-                    $extension = $individualUploadedFile->getClientOriginalExtension();
-                    $newFileName = $purchaseRequest->pia_code . '_' . time() . '.' . $extension; // Đổi tên file
-                    $finalAttachmentPath = $individualUploadedFile->storeAs('pr_attachments', $newFileName, 'public');
-                    Log::info('DEBUG: Individual file stored at: ' . $finalAttachmentPath . '. Timestamp: ' . microtime(true));
-<<<<<<< HEAD
-                }
-                else {
-=======
-                } else {
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
-                    Log::info('DEBUG: No attachment found or uploaded for PR: ' . $purchaseRequest->pia_code);
-                }
-
-                // Cập nhật đường dẫn file đính kèm cuối cùng vào phiếu PR
-                if ($finalAttachmentPath) {
-                    $purchaseRequest->update(['attachment_path' => $finalAttachmentPath]);
-                    Log::info('DEBUG: PR attachment path updated for ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
-                }
-
-                Log::info('DEBUG: Before ApprovalHistory create. Timestamp: ' . microtime(true));
                 ApprovalHistory::create([
                     'purchase_request_id' => $purchaseRequest->id,
                     'user_id' => Auth::id(),
@@ -606,68 +500,39 @@ class PurchaseRequestController extends Controller
                     'signature_image_path' => Auth::user()->signature_image_path ?? 'no-signature.png',
                     'comment' => 'Tạo phiếu đề nghị mới từ import Excel.',
                 ]);
-                Log::info('DEBUG: ApprovalHistory created. Timestamp: ' . microtime(true));
 
                 DB::commit();
-                Log::info('DEBUG: DB commit successful for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
                 $createdCount++;
-                $successfulPiaCodes[] = $finalPrData['pia_code'];
 
-                Log::info('DEBUG: Before sending notification for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
-<<<<<<< HEAD
-                $nextApprovers = $this->findNextApprovers($purchaseRequest);
-                if ($nextApprovers->isNotEmpty()) {
-                    SendApprovalNotification::dispatch($purchaseRequest, $nextApprovers);
-                    Log::info('DEBUG: Notification dispatched for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
-=======
-                // ... bên trong hàm createFromImport(), trong vòng lặp foreach
                 $nextApprovers = $this->findNextApprovers($purchaseRequest);
                 if ($nextApprovers->isNotEmpty()) {
                     foreach ($nextApprovers as $approver) {
                         SendApprovalNotification::dispatch($purchaseRequest, $approver);
                     }
-                    Log::info('DEBUG: Notification jobs dispatched for PR: ' . $purchaseRequest->id . '. Timestamp: ' . microtime(true));
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
-                } else {
-                    Log::info('DEBUG: No next approvers found for PR: ' . $purchaseRequest->id . '. No notification dispatched.');
                 }
 
             } catch (\Exception $e) {
                 DB::rollBack();
                 $errors[] = "Lỗi khi lưu phiếu '{$finalPrData['pia_code']}': " . $e->getMessage();
-                Log::error("ERROR: Failed to create PR '{$finalPrData['pia_code']}'. Error: " . $e->getMessage(), ['trace' => $e->getTraceAsString(), 'timestamp_error' => microtime(true)]);
                 $failedCount++;
             }
         }
 
-        Log::info('DEBUG: All PRs processed. Starting cleanup. Timestamp: ' . microtime(true));
-<<<<<<< HEAD
-        // Không còn thư mục tạm từ ZIP để xóa
-        // if ($originalTempAttachmentsDir && Storage::disk('local')->exists($originalTempAttachmentsDir)) {
-        //     Storage::disk('local')->deleteDirectory($originalTempAttachmentsDir);
-        //     Log::info('DEBUG: Temporary attachment directory cleaned up. Timestamp: ' . microtime(true));
-        // } else {
-        //     Log::info('DEBUG: No temporary attachment directory to clean up or path is null.');
-        // }
-=======
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
         $request->session()->forget('imported_purchase_requests_' . $sessionId);
-        Log::info('DEBUG: Session data forgotten. Timestamp: ' . microtime(true));
 
         $message = "Đã tạo thành công {$createdCount} phiếu đề nghị.";
         if ($failedCount > 0) {
             $message .= " Thất bại {$failedCount} phiếu.";
         }
-        Log::info('DEBUG: createFromImport finished. Total created: ' . $createdCount . ', failed: ' . $failedCount . '. Timestamp: ' . microtime(true));
 
         return response()->json([
             'success' => ($createdCount > 0 && $failedCount == 0),
             'message' => $message,
             'errors' => $errors,
-            'successful_pia_codes' => $successfulPiaCodes,
             'redirect_url' => route('users.purchase-requests.index')
         ]);
     }
+
 
 
 

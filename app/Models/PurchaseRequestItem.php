@@ -23,12 +23,8 @@ class PurchaseRequestItem extends Model
         'subtotal',
         'using_dept_code',
         'plant_system',
-<<<<<<< HEAD
-       
-=======
         // 'purchase_group',   // Cột mới từ PGr
         // 'legacy_item_code', // Cột mới từ A (Cột B)
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
     ];
 
     protected $casts = [

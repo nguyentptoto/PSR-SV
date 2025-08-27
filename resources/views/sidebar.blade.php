@@ -10,7 +10,7 @@
 
                  @can('is-level-1')
                  {{-- Quản lý phiếu (Excel) --}}
-                 <li class="nav-item {{ request()->is('users/purchase-requests*') && !request()->is('users/pdf-requests*') ? 'menu-open' : '' }}">
+                 <!-- <li class="nav-item {{ request()->is('users/purchase-requests*') && !request()->is('users/pdf-requests*') ? 'menu-open' : '' }}">
                      <a href="#" class="nav-link {{ request()->is('users/purchase-requests*') && !request()->is('users/pdf-requests*') ? 'active' : '' }}">
                          <i class="nav-icon bi bi-file-text-fill"></i>
                          <p>
@@ -34,7 +34,7 @@
                              </a>
                          </li>
                      </ul>
-                 </li>
+                 </li> -->
 
                  {{-- Quản lý phiếu (PDF) --}}
                  <li class="nav-item {{ request()->is('users/pdf-requests*') ? 'menu-open' : '' }}">
@@ -76,7 +76,7 @@
         </a>
         <ul class="nav nav-treeview">
             {{-- Menu con cho phê duyệt Excel --}}
-            <li class="nav-item">
+            <!-- <li class="nav-item">
                 <a href="{{ route('users.approvals.index') }}"
                    class="nav-link {{ request()->routeIs('users.approvals.index') ? 'active' : '' }}">
                     <i class="nav-icon bi bi-circle"></i>
@@ -89,7 +89,7 @@
                     <i class="nav-icon bi bi-circle"></i>
                     <p>Lịch sử Excel đã duyệt</p>
                 </a>
-            </li>
+            </li> -->
 
             {{-- THÊM MENU CON MỚI CHO PHÊ DUYỆT PDF --}}
             <li class="nav-item">

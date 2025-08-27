@@ -1,5 +1,3 @@
-{{-- File: resources/views/admin/_partials/toast.blade.php --}}
-
 @if (session()->has('notification'))
     <script>
         // Đợi cho trang tải xong hoàn toàn rồi mới thực thi
@@ -16,7 +14,6 @@
                     toast.onmouseleave = Swal.resumeTimer;
                 }
             });
-
             // Gọi Toast với loại (icon) và thông báo từ session
             Toast.fire({
                 icon: '{{ session('notification')['type'] }}', // 'success' hoặc 'error'

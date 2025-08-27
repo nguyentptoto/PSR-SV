@@ -37,7 +37,11 @@ class UserController extends Controller
         $perPage = $request->input('per_page', 15);
 
         $query = User::query()->with([
-            'mainBranch', 'sections', 'assignments.group', 'assignments.branch', 'assignments.approvalRank'
+            'mainBranch',
+            'sections',
+            'assignments.group',
+            'assignments.branch',
+            'assignments.approvalRank'
         ]);
 
         if ($request->filled('employee_id')) {
@@ -104,7 +108,6 @@ class UserController extends Controller
             'prs_id' => 'nullable|string|max:50|unique:users,prs_id',
             'job_title_id' => 'required|exists:job_titles,id',
             'main_branch_id' => 'required|exists:branches,id',
-            'manager_id' => 'nullable|exists:users,id',
             'status' => 'required|boolean',
             'signature_image' => 'nullable|image|mimes:png,jpg,jpeg|max:1024',
             'sections' => 'required|array',
@@ -115,7 +118,7 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
-            $createData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id', 'manager_id']);
+            $createData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id']);
             $createData['password'] = Hash::make('12345678');
 
             if ($request->hasFile('signature_image')) {
@@ -152,135 +155,6 @@ class UserController extends Controller
     }
 
     public function show(User $user)
-<<<<<<< HEAD
-{
-    // Tải các quan hệ cần thiết, đảm bảo gọi đúng tên 'sections' (số nhiều)
-    $user->load([
-        'mainBranch' => function ($query) {
-            $query->whereNotNull('id');
-        },
-        'jobTitle' => function ($query) {
-            $query->whereNotNull('id');
-        },
-        'sections',
-        'assignments.branch',
-        'assignments.group',
-        'assignments.approvalRank'
-    ]);
-
-    $userAssignments = $user->assignments;
-    $userGroupIds = $userAssignments->pluck('group_id')->unique()->toArray();
-    $userMaxRankLevel = $userAssignments->pluck('approvalRank.rank_level')->max() ?? 0;
-
-    // Lấy danh sách ID các phòng ban mà người dùng này thuộc về
-    $userSectionIds = $user->sections->pluck('id')->toArray();
-
-    // Kiểm tra các điều kiện cần thiết, bao gồm cả việc người dùng phải có phòng ban
-    if (empty($userGroupIds) || !$user->main_branch_id || empty($userSectionIds)) {
-        $purchasingSuperiors = collect([]);
-        $requestingSuperiors = collect([]);
-        return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
-    }
-
-    // Truy vấn tìm cấp trên
-    $superiors = User::where('id', '!=', $user->id)
-        // Dùng whereHas để tìm những người dùng có chung ít nhất một phòng ban
-        ->whereHas('sections', function ($query) use ($userSectionIds) {
-            $query->whereIn('sections.id', $userSectionIds);
-        })
-        // Giữ nguyên logic tìm cấp trên dựa trên assignment
-        ->whereHas('assignments', function ($query) use ($userGroupIds, $userMaxRankLevel, $user) {
-            $query->whereIn('group_id', $userGroupIds)
-                ->where('branch_id', $user->main_branch_id)
-                ->whereHas('approvalRank', function ($subQuery) use ($userMaxRankLevel) {
-                    $subQuery->where('rank_level', '>', $userMaxRankLevel);
-                });
-        })->with(['assignments.approvalRank', 'assignments.group'])->get();
-
-    // Khởi tạo các collection để chứa cấp trên đã phân loại
-    $requestingSuperiors = collect([]);
-    $purchasingSuperiors = collect([]);
-
-    // Lặp qua danh sách cấp trên để phân loại vào đúng nhóm
-    foreach ($superiors as $superior) {
-        foreach ($superior->assignments as $assignment) {
-            // Điều kiện này để đảm bảo chỉ lấy đúng assignment liên quan
-            if ($assignment->branch_id == $user->main_branch_id && in_array($assignment->group_id, $userGroupIds) && $assignment->approvalRank && $assignment->approvalRank->rank_level > $userMaxRankLevel) {
-                $rankName = $assignment->approvalRank->name ?? 'Không xác định';
-
-                if ($assignment->group_id == 1) { // Phòng Đề Nghị
-                    if (!isset($requestingSuperiors[$rankName])) {
-                        $requestingSuperiors[$rankName] = collect([]);
-                    }
-                    if (!$requestingSuperiors[$rankName]->contains('id', $superior->id)) {
-                        $requestingSuperiors[$rankName]->push($superior);
-                    }
-                } elseif ($assignment->group_id == 2) { // Phòng Mua
-                    if (!isset($purchasingSuperiors[$rankName])) {
-                        $purchasingSuperiors[$rankName] = collect([]);
-                    }
-                    if (!$purchasingSuperiors[$rankName]->contains('id', $superior->id)) {
-                        $purchasingSuperiors[$rankName]->push($superior);
-                    }
-                }
-            }
-        }
-    }
-
-    // Lấy thứ tự các cấp bậc để sắp xếp
-    $rankOrder = \App\Models\ApprovalRank::orderBy('rank_level')->pluck('name')->flip();
-
-    // Sắp xếp danh sách cấp trên theo rank_level
-    $requestingSuperiors = $requestingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
-        return $rankOrder[$rankName] ?? 999;
-    });
-
-    $purchasingSuperiors = $purchasingSuperiors->sortBy(function ($users, $rankName) use ($rankOrder) {
-        return $rankOrder[$rankName] ?? 999;
-    });
-
-    // Trả về view với dữ liệu đã xử lý
-    return view('admin.users.show', compact('user', 'purchasingSuperiors', 'requestingSuperiors'));
-}
-    public function edit(User $user)
-{
-    $user->load('sections', 'assignments'); // Chỉ cần load assignment là đủ
-    $branches = Branch::all();
-    $sections = Section::all();
-    $groups = Group::all();
-    $ranks = ApprovalRank::where('rank_level', '>', 0)->get();
-    $jobTitles = JobTitle::all();
-
-    $userSections = $user->sections->pluck('id')->toArray();
-
-    // ✅ DÒNG ĐÃ SỬA: Tạo mảng với key là group_id và value là approval_rank_id
-    $userAssignments = $user->assignments->pluck('approval_rank_id', 'group_id')->all();
-
-    return view('admin.users.edit', compact('user', 'branches', 'sections', 'groups', 'ranks', 'userSections', 'userAssignments', 'jobTitles'));
-}
-
-    public function update(Request $request, User $user)
-{
-    $validated = $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-        'employee_id' => 'required|string|max:255|unique:users,employee_id,' . $user->id,
-        'prs_id' => 'nullable|string|max:50|unique:users,prs_id,' . $user->id,
-        'password' => ['nullable', 'confirmed', Rules\Password::min(8)],
-        'job_title_id' => 'required|exists:job_titles,id',
-        'main_branch_id' => 'required|exists:branches,id',
-        'status' => 'required|boolean',
-        'signature_image' => 'nullable|image|mimes:png,jpg,jpeg|max:1024',
-        'sections' => 'required|array',
-        'sections.*' => 'exists:sections,id',
-        'assignments' => 'nullable|array', // Giữ nguyên validation
-        'assignments.*' => 'nullable|exists:approval_ranks,id',
-    ]);
-
-    DB::beginTransaction();
-    try {
-        $updateData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id']);
-=======
     {
         $user->load('mainBranch', 'jobTitle', 'sections', 'assignments.approvalRank', 'assignments.group', 'assignments.branch');
 
@@ -316,9 +190,9 @@ class UserController extends Controller
         $superiorsQuery = User::where('id', '!=', $user->id)
             ->whereHas('assignments', function ($query) use ($userRankLevel, $groupId) {
                 $query->where('group_id', $groupId)
-                      ->whereHas('approvalRank', function ($q) use ($userRankLevel) {
-                          $q->where('rank_level', '>', $userRankLevel);
-                      });
+                    ->whereHas('approvalRank', function ($q) use ($userRankLevel) {
+                        $q->where('rank_level', '>', $userRankLevel);
+                    });
             });
 
         if ($userSectionIds->isNotEmpty()) {
@@ -363,7 +237,7 @@ class UserController extends Controller
             'password' => ['nullable', 'confirmed', Rules\Password::min(8)],
             'job_title_id' => 'required|exists:job_titles,id',
             'main_branch_id' => 'required|exists:branches,id',
-            'manager_id' => 'nullable|exists:users,id',
+
             'status' => 'required|boolean',
             'signature_image' => 'nullable|image|mimes:png,jpg,jpeg|max:1024',
             'sections' => 'required|array',
@@ -374,46 +248,12 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
-            $updateData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id', 'manager_id']);
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
+            $updateData = $request->only(['name', 'email', 'employee_id', 'prs_id', 'main_branch_id', 'status', 'job_title_id']);
 
-        if ($request->filled('password')) {
-            $updateData['password'] = Hash::make($request->password);
-        }
-
-        if ($request->hasFile('signature_image')) {
-            if ($user->signature_image_path) {
-                Storage::disk('public')->delete($user->signature_image_path);
+            if ($request->filled('password')) {
+                $updateData['password'] = Hash::make($request->password);
             }
-            $imageFile = $request->file('signature_image');
-            $employeeId = $validated['employee_id'];
-            $extension = $imageFile->getClientOriginalExtension();
-            $newFileName = $employeeId . '.' . $extension;
-            $path = $imageFile->storeAs('signatures', $newFileName, 'public');
-            $updateData['signature_image_path'] = $path;
-        }
 
-<<<<<<< HEAD
-        $user->update($updateData);
-        $user->sections()->sync($validated['sections']);
-
-        // ✅ BỌC TOÀN BỘ LOGIC XỬ LÝ ASSIGNMENT TRONG LỆNH IF NÀY
-        // Chỉ cập nhật assignments nếu trường này được gửi đi từ form
-        if ($request->has('assignments')) {
-            $user->assignments()->delete(); // Xóa các phân quyền cũ
-
-            if (!empty($validated['assignments'])) {
-                foreach ($validated['assignments'] as $group_id => $approval_rank_id) {
-                    if (!empty($approval_rank_id)) {
-                        $user->assignments()->create([
-                            'group_id' => $group_id,
-                            'branch_id' => $validated['main_branch_id'],
-                            'approval_rank_id' => $approval_rank_id,
-                        ]);
-                    }
-                }
-            }
-=======
             if ($request->hasFile('signature_image')) {
                 if ($user->signature_image_path) {
                     Storage::disk('public')->delete($user->signature_image_path);
@@ -450,21 +290,9 @@ class UserController extends Controller
             DB::rollBack();
             Log::error('Lỗi cập nhật người dùng: ' . $e->getMessage());
             return back()->with('error', 'Đã xảy ra lỗi: ' . $e->getMessage())->withInput();
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
         }
-
-        DB::commit();
-        return redirect()->route('admin.users.index')->with('success', 'Cập nhật người dùng thành công.');
-    } catch (\Exception $e) {
-        DB::rollBack();
-        \Log::error('Lỗi cập nhật người dùng: ' . $e->getMessage());
-        return back()->with('error', 'Đã xảy ra lỗi: ' . $e->getMessage())->withInput();
     }
-<<<<<<< HEAD
-}
-=======
 
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
     public function destroy(User $user)
     {
         DB::beginTransaction();

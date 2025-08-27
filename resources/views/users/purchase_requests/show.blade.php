@@ -150,11 +150,7 @@
                     <li class="list-group-item">
                         <div class="d-flex">
                             <div class="me-3">
-<<<<<<< HEAD
-                               @if ($history->signature_image_path && $history->signature_image_path !== 'no-signature.png')
-=======
                                    @if ($history->signature_image_path && $history->signature_image_path !== 'no-signature.png')
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
     {{-- Nếu có chữ ký hợp lệ, hiển thị nó từ storage --}}
     <img src="{{ asset('storage/' . $history->signature_image_path) }}" alt="Chữ ký"
          class="img-thumbnail" style="width: 80px; height: 80px; object-fit: contain;">

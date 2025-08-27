@@ -25,32 +25,6 @@
                             $mainBranchAssignments = $user->assignments->where('branch_id', $user->main_branch_id);
                         @endphp
 
-<<<<<<< HEAD
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Thông tin quyền hạn của bạn</h3>
-            </div>
-            <div class="card-body">
-
-            @php
-                $mainBranchAssignments = $user->assignments->where('branch_id', $user->main_branch_id);
-            @endphp
-
-            @if ($mainBranchAssignments->isNotEmpty())
-                <ul class="list-group">
-                    @foreach ($mainBranchAssignments as $assignment)
-                        <li class="list-group-item">
-                            Tại chi nhánh chính <strong>{{ $assignment->branch->name }}</strong>,
-                            trong nhóm <strong>{{ $assignment->group->name }}</strong>,
-                            bạn có quyền <strong>{{ $assignment->approvalRank->name }}</strong>.
-                        </li>
-                    @endforeach
-                </ul>
-            @else
-                <p>Bạn chưa được gán quyền hạn nào tại chi nhánh chính.</p>
-            @endif
-        </div>
-=======
                         {{-- ✅ SỬA ĐỔI: Logic hiển thị quyền hạn được nâng cấp --}}
                         @if ($mainBranchAssignments->isNotEmpty() || $assignedRequestsCount > 0)
                             <ul class="list-group">
@@ -82,7 +56,6 @@
             </div>
 
 
->>>>>>> 008a4b41ca5eda2e1bb01a13d8f90c7b4f76a3ab
         </div>
     </div>
 @endsection

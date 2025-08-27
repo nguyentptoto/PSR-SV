@@ -43,18 +43,7 @@
                 </select>
             </div>
 
-            {{-- ✅ ĐÃ THÊM: Ô chọn Người quản lý trực tiếp --}}
-            <div class="form-group">
-                <label for="manager_id">Người quản lý trực tiếp</label>
-                <select name="manager_id" id="manager-select2"  style="width: 100%;">
-                    <option value="">-- Không có --</option>
-                    @foreach($managers as $manager)
-                        <option value="{{ $manager->id }}" {{ old('manager_id', $user->manager_id ?? '') == $manager->id ? 'selected' : '' }}>
-                            {{ $manager->name }} ({{ $manager->employee_id }})
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+
 
             <div class="form-group">
                 <label for="main_branch_id">Chi nhánh chính*</label>

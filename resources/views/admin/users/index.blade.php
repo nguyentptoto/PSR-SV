@@ -152,8 +152,6 @@
                                     <a href="{{ route('admin.users.edit', $user->id) }}" class="btn btn-primary btn-sm">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-
-                                    {{-- ✅ THAY ĐỔI: Form thay đổi trạng thái người dùng --}}
                                     @if (Auth::id() !== $user->id)
                                         {{-- Ngăn hiển thị nút cho tài khoản của chính mình --}}
                                         <form action="{{ route('admin.users.toggleStatus', $user->id) }}" method="POST"

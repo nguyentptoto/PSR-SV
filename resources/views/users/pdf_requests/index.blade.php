@@ -78,6 +78,8 @@
                             <th>Người yêu cầu</th>
                             <th>Trạng thái</th>
                             <th>Cấp duyệt hiện tại</th>
+                                                        <th>Yêu cầu Giám đốc duyệt</th>
+
                             <th>Ngày tạo</th>
                             <th>Hành động</th>
                         </tr>
@@ -126,6 +128,13 @@
                                     <span class="{{ $statusClass }}">{{ $statusText }}</span>
                                 </td>
                                 <td>Cấp {{ $pdfPr->current_rank_level }}</td>
+                                  <td>
+                                    @if($pdfPr->requires_director_approval)
+                                        <span class="badge badge-danger">Có</span>
+                                    @else
+                                        <span class="badge badge-success">Không</span>
+                                    @endif
+                                </td>
                                 <td>{{ $pdfPr->created_at->format('d/m/Y H:i') }}</td>
                                 <td>
                                     {{-- Nút xem chi tiết (nếu có show method cho PDF PR) --}}
@@ -154,8 +163,19 @@
                                         </a>
                                     @endif
 
-                                    {{-- Các nút hành động edit và delete cho PDF PR --}}
-                                    @if ($pdfPr->status === 'pending_approval' && $pdfPr->requester_id === Auth::id())
+                                    {{-- Tìm đoạn code hiển thị nút Sửa/Xóa trong file index.blade.php --}}
+
+                                    @php
+                                        $hasBeenApproved = $pdfPr
+                                            ->approvalHistories()
+                                            ->where('action', 'approved')
+                                            ->exists();
+                                    @endphp
+
+                                    {{-- SỬA LẠI ĐIỀU KIỆN @if --}}
+                                    @if (
+                                        $pdfPr->requester_id === Auth::id() &&
+                                            (($pdfPr->status === 'pending_approval' && !$hasBeenApproved) || $pdfPr->status === 'rejected'))
                                         <a href="{{ route('users.pdf-requests.edit', $pdfPr->id) }}"
                                             class="btn btn-primary btn-sm" title="Chỉnh sửa">
                                             Sửa
@@ -170,7 +190,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center">Không có phiếu đề nghị PDF nào.</td>
+                                <td colspan="8" class="text-center">Không có phiếu đề nghị PDF nào.</td>
                             </tr>
                         @endforelse
                     </tbody>

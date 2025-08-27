@@ -1,6 +1,4 @@
 @include('head')
-
-
 <body class="login-page bg-body-secondary app-loaded">
 
     <canvas id="fish-canvas"></canvas>
@@ -53,7 +51,6 @@
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary">Đăng nhập</button>
 
-
                             </div>
                         </div>
                         <div class="col-7 text-end">
@@ -70,9 +67,6 @@
 
     @include('script')
     @include('admin._partials.toast')
-
-
-
 </body>
 
 </html>

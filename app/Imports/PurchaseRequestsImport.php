@@ -4,275 +4,164 @@ namespace App\Imports;
 
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
-use App\Models\Section;
+use App\Models\User;
 use App\Models\ExecutingDepartment;
-use App\Models\Branch;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Concerns\SkipsOnError;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\BeforeSheet;
+use Maatwebsite\Excel\Validators\ValidationException;
+use Maatwebsite\Excel\Concerns\SkipsErrors;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 
-class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkReading
+class PurchaseRequestsImport extends DefaultValueBinder implements ToCollection, WithHeadingRow, WithValidation, SkipsOnError, WithChunkReading, WithEvents, WithCustomValueBinder
 {
-    private $errors = [];
+    use SkipsErrors;
+
     private $importedData = [];
+    private $rowCounter = 1;
+
+    public function bindValue(Cell $cell, $value)
+    {
+        $cell->setValueExplicit($value, DataType::TYPE_STRING);
+        return true;
+    }
 
     public function collection(Collection $rows)
     {
-        // Gỡ bình luận dòng này để xem các tiêu đề cột được Maatwebsite/Excel xử lý như thế nào trong log của Laravel
-        // Điều này cực kỳ hữu ích để debug nếu bạn gặp lỗi không tìm thấy cột
-        // if ($rows->isNotEmpty() && $rows->first() instanceof \ArrayAccess) {
-        //     Log::info('Excel Headers (processed by WithHeadingRow):', $rows->first()->keys()->toArray());
-        // }
+        $groupedRequests = $rows->groupBy('purchreq');
 
-        // Lấy thông tin prs_id của người dùng đang đăng nhập
-        $loggedInUserPrsId = Auth::user()->prs_id;
+        foreach ($groupedRequests as $piaCode => $items) {
+            $firstItem = $items->first();
+            $firstItemRowNumber = $this->rowCounter + $items->keys()->first();
 
-        // Nhóm các dòng theo cột PR_NO linh hoạt:
-        $groupedItems = $rows->groupBy(function($item) {
-            return (string)($item['purchreq'] ?? $item['purch_req'] ?? $item['purch.req.'] ?? '');
-        });
-
-        $requester = Auth::user();
-        if (!$requester) {
-            $this->errors[] = "Lỗi xác thực: Không tìm thấy người yêu cầu. Vui lòng đăng nhập lại.";
-            return;
-        }
-
-        $branch = $requester->mainBranch;
-        if (!$branch) {
-            $this->errors[] = "Không tìm thấy thông tin nhà máy (Plant) của người dùng. Vui lòng kiểm tra cấu hình người dùng.";
-            return;
-        }
-
-        $section = $requester->sections->first();
-        if (!$section) {
-            $this->errors[] = "Không tìm thấy thông tin phòng ban của bạn (Section). Vui lòng kiểm tra cấu hình người dùng.";
-            return;
-        }
-
-        // Lấy danh sách các mã PR_NO đã tồn tại trong DB để kiểm tra trùng lặp
-        $existingPiaCodes = PurchaseRequest::whereIn('pia_code', array_keys($groupedItems->toArray()))
-                                            ->pluck('pia_code')
-                                            ->toArray();
-
-        foreach ($groupedItems as $piaCode => $items) {
-            $priority = (string)($firstItemRow['priority'] ?? null); // <-- CẬP NHẬT DÒNG NÀY
-
-            // Bỏ qua nếu PR_NO trống hoặc đã tồn tại
             if (empty($piaCode)) {
-                $this->errors[] = "Dữ liệu chứa một nhóm mặt hàng không có 'PR_NO' (cột 'Purch.Req.' hoặc tương đương). Nhóm này sẽ bị bỏ qua.";
-                continue;
-            }
-            if (in_array($piaCode, $existingPiaCodes)) {
-                $this->errors[] = "Mã phiếu PR_NO '{$piaCode}' đã tồn tại trong hệ thống. Phiếu này sẽ bị bỏ qua.";
+                $this->errors[] = "Dòng {$firstItemRowNumber}: Bỏ qua phiếu do Mã Phiếu (Purch.Req.) trống.";
                 continue;
             }
 
-            // Lấy thông tin chung của phiếu từ dòng đầu tiên của nhóm
-            $firstItemRow = $items->first();
-            $originalExcelRowFirstItem = $rows->search($firstItemRow) + 2;
+            $creatorPrsId = $firstItem['created'] ?? null;
+            $requesterUser = $creatorPrsId ? User::where('prs_id', (string)$creatorPrsId)->first() : null;
+            $requesterId = $requesterUser->id ?? Auth::id();
 
-            // Ánh xạ ExecutingDepartmentCode
-            $executingDepartmentCode = (string)($firstItemRow['requisnr'] ?? $firstItemRow['requisnr.'] ?? $firstItemRow['requesting'] ?? '');
-            $executingDepartmentCode = trim($executingDepartmentCode);
-
-            $executingDepartment = ExecutingDepartment::where('code', $executingDepartmentCode)->first();
-            if (empty($executingDepartmentCode) || !$executingDepartment) {
-                $this->errors[] = "Mã phòng ban yêu cầu '{$executingDepartmentCode}' (cột 'Requisnr.' hoặc 'Requesting') không hợp lệ hoặc không tồn tại cho phiếu '{$piaCode}' (Dòng: {$originalExcelRowFirstItem}).";
-                continue;
+            if (!$requesterUser && $creatorPrsId) {
+                $this->errors[] = "Mã phiếu {$piaCode} (dòng {$firstItemRowNumber}): Không tìm thấy người tạo (created: {$creatorPrsId}). Phiếu sẽ được gán cho người đang import.";
             }
 
-            // Ánh xạ Requested Delivery Date
-            $requestedDeliveryDate = null;
-            $deliveryDateExcel = $firstItemRow['delivdt'] ?? $firstItemRow['deliv.dt'] ?? $firstItemRow['deliv. date'] ?? $firstItemRow['deliv_date'] ?? null;
-            if (!empty($deliveryDateExcel)) {
-                try {
-                    if (is_numeric($deliveryDateExcel)) {
-                        $requestedDeliveryDate = Carbon::createFromTimestamp((($deliveryDateExcel - 25569) * 86400));
-                    } else {
-                        $requestedDeliveryDate = Carbon::parse($deliveryDateExcel);
-                    }
-                } catch (\Exception $e) {
-                    $this->errors[] = "Ngày yêu cầu giao hàng '{$deliveryDateExcel}' (cột 'Deliv.dt' hoặc 'Deliv. Date') không hợp lệ tại phiếu '{$piaCode}' (Dòng: {$originalExcelRowFirstItem}). Lỗi: {$e->getMessage()}.";
-                    continue;
-                }
-            } else {
-                $this->errors[] = "Ngày yêu cầu giao hàng (cột 'Deliv.dt' hoặc 'Deliv. Date') là bắt buộc tại phiếu '{$piaCode}' (Dòng: {$originalExcelRowFirstItem}).";
-                continue;
-            }
-
-            // Ánh xạ Currency
-            $currency = (string)($firstItemRow['crcy'] ?? $firstItemRow['currency'] ?? 'VND');
-
-            // Ánh xạ SAP Request Date
-            $sapRequestDate = null;
-            $requestDateExcel = $firstItemRow['reqdate'] ?? $firstItemRow['req.date'] ?? $firstItemRow['req_date'] ?? null;
-            if (!empty($requestDateExcel)) {
-                 try {
-                    if (is_numeric($requestDateExcel)) {
-                        $sapRequestDate = Carbon::createFromTimestamp((($requestDateExcel - 25569) * 86400));
-                    } else {
-                        $sapRequestDate = Carbon::parse($requestDateExcel);
-                    }
-                } catch (\Exception $e) {
-                    $this->errors[] = "Ngày yêu cầu (Req.Date) '{$requestDateExcel}' không hợp lệ tại phiếu '{$piaCode}' (Dòng: {$originalExcelRowFirstItem}). Lỗi: {$e->getMessage()}.";
-                }
-            }
-
-            // Ánh xạ PO Number
-            $poNumber = (string)($firstItemRow['po'] ?? null);
-
-            // Ánh xạ PO Date
-            $poDate = null;
-            $poDateExcel = $firstItemRow['po_date'] ?? $firstItemRow['po date'] ?? null;
-            if (!empty($poDateExcel)) {
-                try {
-                    if (is_numeric($poDateExcel)) {
-                        $poDate = Carbon::createFromTimestamp((($poDateExcel - 25569) * 86400));
-                    } else {
-                        $poDate = Carbon::parse($poDateExcel);
-                    }
-                } catch (\Exception $e) {
-                    $this->errors[] = "Ngày PO (PO Date) '{$poDateExcel}' không hợp lệ tại phiếu '{$piaCode}' (Dòng: {$originalExcelRowFirstItem}). Lỗi: {$e->getMessage()}.";
-                }
-            }
-
-            // Ánh xạ Created By: log là 'created'. Fallback về prs_id của người dùng đang đăng nhập.
-            $sapCreatedBy = (string)($firstItemRow['created'] ?? null);
-            if (empty($sapCreatedBy)) {
-                $sapCreatedBy = $loggedInUserPrsId;
-            }
+            $requisnrCode = $firstItem['requisnr'] ?? null;
+            $executingDepartment = $requisnrCode ? ExecutingDepartment::where('code', $requisnrCode)->first() : null;
 
             $prData = [
-                'requester_id' => $requester->id,
-                'branch_id' => $branch->id,
-                'section_id' => $section->id,
-                'executing_department_id' => $executingDepartment->id,
-                'pia_code' => $piaCode,
-                // CẬP NHẬT DÒNG NÀY ĐỂ GÁN GIÁ TRỊ TỪ SAP REQUEST DATE
-                'sap_release_date' => $sapRequestDate ? $sapRequestDate->format('Y-m-d') : null,
-                'requested_delivery_date' => $requestedDeliveryDate->format('Y-m-d'),
-                'currency' => $currency,
-                'requires_director_approval' => false,
-                'priority' => $priority,
-                'remarks' => null,
-                'attachment_path' => null,
-                'status' => 'pending_approval',
-                'current_rank_level' => 2,
-                'sap_request_date' => $sapRequestDate ? $sapRequestDate->format('Y-m-d') : null,
-                'po_number' => $poNumber,
-                'po_date' => $poDate ? $poDate->format('Y-m-d') : null,
-                'sap_created_by' => $sapCreatedBy,
-                'total_amount' => 0,
-                'total_order_quantity' => 0,
-                'total_inventory_quantity' => 0,
+                'pia_code' => (string)$piaCode,
+                'sap_release_date' => $this->excelDateToCarbon($firstItem['req_date'] ?? null),
+                'requested_delivery_date' => $this->excelDateToCarbon($firstItem['delivdate'] ?? null),
+                'currency' => $firstItem['crcy'] ?? 'VND',
+                'sap_request_date' => $this->excelDateToCarbon($firstItem['req_date'] ?? null),
+                'sap_created_by' => $creatorPrsId,
+                'requester_id' => $requesterId,
+                'executing_department_id' => $executingDepartment->id ?? null,
             ];
 
-            $currentPrTotalAmount = 0;
-            $currentPrTotalOrderQuantity = 0;
-            $currentPrTotalInventoryQuantity = 0;
-            $itemsForCurrentPr = [];
+            $prRules = [
+                'pia_code' => ['required', 'string', 'max:255', Rule::unique('purchase_requests', 'pia_code')],
+                'requested_delivery_date' => 'required|date',
+            ];
 
-            foreach ($items as $itemData) {
-                $originalExcelRow = $rows->search($itemData) + 2;
+            $validator = Validator::make($prData, $prRules);
 
-                // Ánh xạ Material
-                $itemCode = (string)($itemData['material'] ?? '');
-                // Ánh xạ Item Name
-                $itemName = (string)($itemData['short_text'] ?? $itemData['description'] ?? '');
-                // Ánh xạ Quantity
-                $orderQuantity = (float)($itemData['quantity'] ?? 0);
-                // Ánh xạ Total Val.
-                $totalVal = (float)($itemData['total_val'] ?? $itemData['total val.'] ?? 0);
-
-                // Tính toán estimated_price
-                $estimatedPrice = (float)($itemData['estimated'] ?? 0);
-                if ($estimatedPrice == 0 && $orderQuantity > 0 && $totalVal > 0) {
-                    $estimatedPrice = round($totalVal / $orderQuantity, 2);
-                } else if ($estimatedPrice == 0 && $orderQuantity == 0 && $totalVal > 0) {
-                     $this->errors[] = "Dòng {$originalExcelRow} (PR: {$piaCode}): Số lượng đặt (Quantity) bằng 0, không thể tính giá dự tính từ 'Total Val.'. Giá dự tính sẽ được đặt là 0.";
+            if ($validator->fails()) {
+                foreach ($validator->errors()->all() as $error) {
+                    $this->errors[] = "Mã phiếu {$piaCode} (dòng {$firstItemRowNumber}): " . $error;
                 }
-
-                // Validation cho từng item
-                if (empty($itemCode)) {
-                    $this->errors[] = "Dòng {$originalExcelRow} (PR: {$piaCode}): Mã hàng (Material) không được trống.";
-                    continue;
-                }
-                if (empty($itemName)) {
-                    $this->errors[] = "Dòng {$originalExcelRow} (PR: {$piaCode}): Tên hàng (Short Text/Description) không được trống.";
-                    continue;
-                }
-                if ($orderQuantity <= 0) {
-                    $this->errors[] = "Dòng {$originalExcelRow} (PR: {$piaCode}): Số lượng đặt (Quantity) phải là số dương.";
-                    continue;
-                }
-                if ($estimatedPrice < 0) {
-                    $this->errors[] = "Dòng {$originalExcelRow} (PR: {$piaCode}): Giá dự tính phải là số không âm.";
-                    continue;
-                }
-
-                $subtotal = $orderQuantity * $estimatedPrice;
-
-                // Ánh xạ Plant
-                $plant = (string)($itemData['plnt'] ?? $itemData['plant'] ?? '');
-                // Ánh xạ SLoc
-                $sloc = (string)($itemData['sloc'] ?? '');
-                $plantSystem = trim($plant . ' ' . $sloc);
-
-                // Ánh xạ PGr
-                $purchaseGroup = (string)($itemData['pgr'] ?? null);
-
-                // Ánh xạ A
-                $legacyItemCode = (string)($itemData['a'] ?? null);
-
-                $itemsForCurrentPr[] = [
-                    'item_code' => $itemCode,
-                    'item_name' => $itemName,
-                    'old_item_code' => (string)($itemData['item'] ?? null),
-                    'order_quantity' => $orderQuantity,
-                    'order_unit' => (string)($itemData['un'] ?? $itemData['unit'] ?? 'PC'),
-                    'inventory_quantity' => (float)($itemData['inventory_quantity'] ?? $orderQuantity),
-                    'inventory_unit' => (string)($itemData['inventory_unit'] ?? $itemData['un'] ?? $itemData['unit'] ?? 'PC'),
-                    'r3_price' => (float)($itemData['r3_price'] ?? 0),
-                    'estimated_price' => $estimatedPrice,
-                    'subtotal' => $subtotal,
-                    'using_dept_code' => (string)($itemData['trackingno'] ?? null),
-                    'plant_system' => $plantSystem,
-                    // 'purchase_group' => $purchaseGroup,
-                    // 'legacy_item_code' => $legacyItemCode,
-                ];
-
-                $currentPrTotalAmount += $subtotal;
-                $currentPrTotalOrderQuantity += $orderQuantity;
-                $currentPrTotalInventoryQuantity += ((float)($itemData['inventory_quantity'] ?? $orderQuantity));
-            }
-
-            if (empty($itemsForCurrentPr)) {
-                $this->errors[] = "Phiếu '{$piaCode}' không có mặt hàng hợp lệ nào để xem trước sau khi kiểm tra dữ liệu.";
                 continue;
             }
 
-            $prData['total_amount'] = $currentPrTotalAmount;
-            $prData['total_order_quantity'] = $currentPrTotalOrderQuantity;
-            $prData['total_inventory_quantity'] = $currentPrTotalInventoryQuantity;
-            $prData['items'] = $itemsForCurrentPr;
+            $itemsData = [];
+            foreach ($items as $key => $item) {
+                $currentItemRowNumber = $this->rowCounter + $key;
+                if (empty($item['material'])) continue;
 
-            $this->importedData[] = $prData;
+                $orderQuantity = $this->parseNumeric($item['order_unit_qty'] ?? $item['quantity'] ?? null);
+                $estTotalAmount = $this->parseNumeric($item['est_total_amount'] ?? null);
+                $valnPrice = $this->parseNumeric($item['valn_price'] ?? null);
+                $orderUnit = $item['order_unit'] ?? $item['un'] ?? 'N/A';
+
+                $estimatedPrice = $valnPrice;
+                if (empty($estimatedPrice) || $estimatedPrice == 0) {
+                    $estimatedPrice = (!empty($estTotalAmount) && !empty($orderQuantity) && $orderQuantity != 0) ? ($estTotalAmount / $orderQuantity) : 0;
+                }
+
+                $itemData = [
+                    'item_code' => $item['material'],
+                    'item_name' => $item['short_text'],
+                    'old_item_code' => $item['old_material_number'] ?? null,
+                    'order_quantity' => $orderQuantity,
+                    'order_unit' => $orderUnit,
+                    'inventory_quantity' => $this->parseNumeric($item['quantity'] ?? $orderQuantity),
+                    'inventory_unit' => $item['un'] ?? $orderUnit,
+                    'r3_price' => $this->parseNumeric($item['r3_unit_price'] ?? null),
+                    'estimated_price' => $estimatedPrice,
+                    'subtotal' => ($orderQuantity ?? 0) * ($estimatedPrice ?? 0),
+                    'using_dept_code' => $item['requisnr'] . '-' . ($item['a'] ?? null),
+                    'plant_system' => ($item['plnt'] ?? '') . '-' . ($item['sloc'] ?? '')  ?? '',
+                ];
+
+                $itemRules = [
+                    'item_code' => 'required|string|max:255',
+                    'item_name' => 'required|string|max:255',
+                    'old_item_code' => 'nullable|string|max:255',
+                    'order_quantity' => 'required|numeric|min:0.001',
+                    'order_unit' => 'nullable|string|max:20',
+                    'inventory_quantity' => 'nullable|numeric|min:0',
+                    'inventory_unit' => 'nullable|string|max:20',
+                    'r3_price' => 'nullable|numeric|min:0',
+                    'estimated_price' => 'required|numeric|min:0',
+                    'subtotal' => 'nullable|numeric',
+                    'using_dept_code' => 'nullable|string|max:255',
+                    'plant_system' => 'nullable|string|max:255',
+                ];
+
+                $itemValidator = Validator::make($itemData, $itemRules);
+                if ($itemValidator->fails()) {
+                    foreach ($itemValidator->errors()->all() as $error) {
+                        $this->errors[] = "Mã phiếu {$piaCode}, Mã hàng {$item['material']} (dòng {$currentItemRowNumber}): " . $error;
+                    }
+                    continue;
+                }
+                $itemsData[] = $itemData;
+            }
+
+            if (empty($itemsData)) {
+                $this->errors[] = "Mã phiếu {$piaCode} (dòng {$firstItemRowNumber}): Không có mặt hàng hợp lệ nào.";
+                continue;
+            }
+
+            $prData['total_order_quantity'] = array_sum(array_column($itemsData, 'order_quantity'));
+            $prData['total_inventory_quantity'] = array_sum(array_column($itemsData, 'inventory_quantity'));
+            $prData['total_amount'] = array_sum(array_column($itemsData, 'subtotal'));
+
+            $this->importedData[] = [
+                'pr_data' => $prData,
+                'items' => $itemsData,
+            ];
         }
     }
 
-    public function headingRow(): int
+    public function getImportedData(): array
     {
-        return 1;
-    }
-
-    public function chunkSize(): int
-    {
-        return 500;
+        return $this->importedData;
     }
 
     public function getErrors(): array
@@ -280,8 +169,107 @@ class PurchaseRequestsImport implements ToCollection, WithHeadingRow, WithChunkR
         return $this->errors;
     }
 
-    public function getImportedData(): array
+    public function rules(): array
     {
-        return $this->importedData;
+        return [
+            'purchreq' => 'required|string',
+            'material' => 'required|string',
+            'short_text' => 'required|string',
+            'delivdate' => 'required',
+            'requisnr' => 'required|string',
+            'sloc' => 'nullable|string',
+            'req_date' => 'nullable',
+            'plnt' => 'nullable|string',
+        ];
+    }
+
+    public function customValidationMessages(): array
+    {
+        return [
+            'purchreq.required' => 'Cột "Purch.Req." không được để trống.',
+            'purchreq.string' => 'Cột "Purch.Req." phải là chuỗi.',
+            'material.required' => 'Cột "Material" không được để trống.',
+            'short_text.required' => 'Cột "Short Text" không được để trống.',
+            'delivdate.required' => 'Cột "Deliv.Date" không được để trống.',
+            'requisnr.required' => 'Cột "Requisnr." không được để trống.',
+            'requisnr.string' => 'Cột "Requisnr." phải là chuỗi.',
+            'sloc.string' => 'Cột "SLoc" phải là chuỗi.',
+            'plnt.string' => 'Cột "Plnt" phải là chuỗi.',
+        ];
+    }
+
+    public function onError(\Throwable $e)
+    {
+        if ($e instanceof ValidationException) {
+            $failures = $e->failures();
+            foreach ($failures as $failure) {
+                $rowNumber = $failure->row();
+                $column = $failure->attribute();
+                $errorMessages = $failure->errors();
+                $value = $failure->values()[$column] ?? 'N/A';
+
+                $logMessage = "Validation Lỗi - Dòng: {$rowNumber}, Cột: '{$column}', Giá trị: '{$value}'. Lỗi: " . implode(', ', $errorMessages);
+                Log::error($logMessage);
+
+                $this->errors[] = "Dòng {$rowNumber}: " . implode(', ', $errorMessages) . " (Cột: {$column})";
+            }
+        } else {
+            $this->errors[] = "Lỗi không xác định: " . $e->getMessage();
+            Log::critical("Lỗi nghiêm trọng khi import: " . $e->getMessage(), ['exception' => $e]);
+        }
+    }
+
+    public function chunkSize(): int
+    {
+        return 1000;
+    }
+
+    private function excelDateToCarbon($value)
+    {
+        if (empty($value)) return null;
+
+        if (is_numeric($value)) {
+            if (strlen((string)$value) === 8 && checkdate(substr($value, 4, 2), substr($value, 6, 2), substr($value, 0, 4))) {
+                try {
+                    return Carbon::createFromFormat('Ymd', $value);
+                } catch (\Exception $e) {
+                }
+            }
+            try {
+                return Carbon::createFromTimestamp(intval(($value - 25569) * 86400));
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
+        if (is_string($value)) {
+            try {
+                if (preg_match('/^\d{4}\.\d{2}\.\d{2}$/', $value)) {
+                    return Carbon::createFromFormat('Y.m.d', $value)->startOfDay();
+                }
+                return Carbon::parse($value);
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private function parseNumeric($value)
+    {
+        if (is_null($value) || $value === '') return null;
+        $cleanedValue = str_replace(',', '', $value);
+        if (is_numeric($cleanedValue)) return (float)$cleanedValue;
+        return null;
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            BeforeSheet::class => function(BeforeSheet $event) {
+                $this->rowCounter = 1;
+            },
+        ];
     }
 }
